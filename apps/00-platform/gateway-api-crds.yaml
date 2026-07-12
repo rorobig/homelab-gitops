@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/kubernetes-sigs/gateway-api.git
     targetRevision: v1.2.1
-    path: config/crd
+    path: config/crd/standard
     directory:
       recurse: true
   destination:
