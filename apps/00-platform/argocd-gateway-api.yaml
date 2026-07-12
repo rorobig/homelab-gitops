@@ -1,15 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: monitoring-app-of-apps
+  name: argocd-gateway-api
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   source:
     repoURL: https://github.com/rorobig/homelab-gitops.git
     targetRevision: main
-    # Scoped bootstrap: observability only.
-    path: apps/10-observability
+    path: platform/networking/argocd-gateway-api
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
@@ -19,4 +20,3 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      # - ServerSideApply=true
