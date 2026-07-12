@@ -5,7 +5,8 @@ metadata:
   namespace: argocd
 spec:
   parentRefs:
-    - name: argocd-gateway
+    - name: shared-gateway
+      namespace: traefik
       sectionName: http
   hostnames:
     - argocd.home.arpa
