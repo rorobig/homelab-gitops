@@ -1,23 +1,26 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: bootstrap-app-of-apps
+  name: keycloak
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    homelab/values-path: platform/keycloak/values.yaml
 spec:
   project: default
   source:
     repoURL: https://github.com/rorobig/homelab-gitops.git
+    chart: keycloak
     targetRevision: main
-    path: apps
-    directory:
-      recurse: true
+    helm:
+      valueFiles:
+        - platform/keycloak/values.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: keycloak
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-

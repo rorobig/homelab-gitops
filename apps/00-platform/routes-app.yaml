@@ -1,14 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: bootstrap-app-of-apps
+  name: routes
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   project: default
   source:
     repoURL: https://github.com/rorobig/homelab-gitops.git
     targetRevision: main
-    path: apps
+    path: platform/networking/routes
     directory:
       recurse: true
   destination:
@@ -20,4 +22,3 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-
