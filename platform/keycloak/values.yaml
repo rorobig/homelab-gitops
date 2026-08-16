@@ -1,3 +1,7 @@
+image:
+  registry: quay.io
+  repository: keycloakx/keycloakx
+  tag: latest
 service:
   type: ClusterIP
 auth:
