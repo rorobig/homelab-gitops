@@ -8,13 +8,16 @@ metadata:
     homelab/values-path: platform/keycloak/values.yaml
 spec:
   project: default
-  source:
-    repoURL: https://github.com/rorobig/homelab-gitops.git
-    chart: keycloak
-    targetRevision: main
-    helm:
-      valueFiles:
-        - platform/keycloak/values.yaml
+  sources:
+    - repoURL: https://charts.bitnami.com/bitnami
+      chart: keycloak
+      targetRevision: 20.0.0
+      helm:
+        valueFiles:
+          - $values/platform/keycloak/values.yaml
+    - repoURL: https://github.com/rorobig/homelab-gitops.git
+      targetRevision: main
+      ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: keycloak
