@@ -1,25 +1,21 @@
 # homelab-gitops
 
-Argo CD source of truth for cluster apps.
+Argo CD source of truth for the k3s cluster built by [homelab-proxmox](https://github.com/rorobig/homelab-proxmox).
 
 ## Layout
 
-- `apps/00-platform` first-wave platform apps
-- `apps/10-observability` observability apps
-- `platform/networking` shared Gateway API resources
-- `bootstrap/` helper manifests/scripts
+- `bootstrap/all-apps-of-apps.yaml` — root Application; syncs everything under `apps/`
+- `apps/00-platform` — Gateway API CRDs, agentgateway (CRDs + controller), the Gateway, routes
+- `apps/10-observability` — kube-prometheus-stack
+- `platform/` — manifests, charts and values that the apps above point at
 
-## Bootstrap from local machine
+Ordering between apps is controlled by `argocd.argoproj.io/sync-wave` annotations.
 
-```bash
-cd bootstrap
-./apply-monitoring-app.sh
-```
+## Bootstrap
 
-By default this applies `all-apps-of-apps.yaml` (full rollout).
-
-To apply only observability:
+The Ansible `argocd-bootstrap` role in homelab-proxmox installs Argo CD and applies the root app.
+To (re)apply it by hand:
 
 ```bash
-APP_MANIFEST=./monitoring-app-of-apps.yaml ./apply-monitoring-app.sh
+kubectl apply -f bootstrap/all-apps-of-apps.yaml
 ```

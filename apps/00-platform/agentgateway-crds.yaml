@@ -1,24 +1,23 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: routes
+  name: agentgateway-crds
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
-    repoURL: https://github.com/rorobig/homelab-gitops.git
-    targetRevision: main
-    path: platform/networking/routes
-    directory:
-      recurse: true
+    repoURL: cr.agentgateway.dev/charts
+    chart: agentgateway-crds
+    targetRevision: v1.5.0
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: agentgateway-system
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true

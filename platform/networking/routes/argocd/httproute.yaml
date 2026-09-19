@@ -5,8 +5,8 @@ metadata:
   namespace: argocd
 spec:
   parentRefs:
-    - name: solo-agent-gateway
-      namespace: solo
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
       sectionName: http
   hostnames:
     - argocd.home.arpa
