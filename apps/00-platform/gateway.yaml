@@ -1,3 +1,4 @@
+# Deploys the one Gateway (platform/networking/gateway/gateway.yaml): the front door on port 80.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

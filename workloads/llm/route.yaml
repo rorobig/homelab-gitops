@@ -1,4 +1,8 @@
-# http://llm.home.arpa/v1/chat/completions  ->  agentgateway  ->  ollama
+# The URL for the LLM:  http://llm.home.arpa/v1/chat/completions
+#
+# Same idea as every HTTPRoute (see platform/networking/routes/argocd/httproute.yaml), with one difference:
+# the target is not a plain Service but an AgentgatewayBackend (backend.yaml). That is what makes the gateway
+# treat the traffic as AI: it reads the prompt, counts tokens, and applies the policies attached to that backend.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

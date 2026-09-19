@@ -1,4 +1,10 @@
-# A tiny local LLM so the demo needs no API key. Swap the model here (and in backend.yaml) to try others.
+# The actual AI model. This part has nothing to do with agentgateway: it's just a server that runs a small
+# open model (qwen2.5:0.5b) on CPU and answers over an OpenAI-style HTTP API. agentgateway sits IN FRONT of it
+# (backend.yaml points at the Service below), so nobody talks to Ollama directly.
+#
+# On start it downloads the model (~400 MB) and only reports Ready once it has it, so the first start takes a
+# minute or two. The model lives in an emptyDir, so a restart downloads it again. To try a different model, change
+# the name here AND in backend.yaml / pirate.yaml.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

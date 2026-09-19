@@ -1,4 +1,32 @@
-# Guardrail at the gateway: prompts containing a credit card number are rejected before they reach the model.
+# WHAT THIS IS: a "prompt guard", a bouncer at the door of the AI.
+#
+# Every prompt sent to llm.home.arpa passes through the gateway before reaching the model. The guard reads the
+# prompt on the way through and can act BEFORE the model ever sees it. The rule lives in the gateway, so no app
+# has to implement it, and no app can forget to.
+#
+# An AgentgatewayPolicy means "attach extra behaviour to something else". It does nothing on its own;
+# targetRefs says what it is attached to.
+#
+#   targetRefs            attach to the AgentgatewayBackend named "ollama" (backend.yaml),
+#                         so every request going to that backend is checked.
+#   backend.ai.promptGuard  the AI-specific checks:
+#     request:            checks on the PROMPT (what the user sends).
+#                         (A matching `response:` list would check the model's ANSWER; not used here.)
+#       - regex:          "look for text that matches a pattern"
+#           builtins:     ready-made patterns the gateway ships with. The full list is:
+#                         CreditCard, Email, PhoneNumber, Ssn, CaSin.  (Only CreditCard is tried here.)
+#                         You can also add your own with `matches: ["<regex>"]`.
+#           action:       what to do when something matches:
+#                           Reject  block it: the client gets an error and the model is never called (used here)
+#                           Mask    let it through, but hide the matched text first. This is the default.
+#                                   (Tried: the request is accepted and the log shows "action": "mask".)
+#                           Audit   let it through untouched and only record that it matched (not tried)
+#         response:       what the client receives on Reject: HTTP 403 plus our message.
+#
+# TRY IT:   ./scripts/llm-demo.sh blocked
+# THEN:     kubectl -n agentgateway-system logs deploy/agentgateway-proxy --tail=5
+#           and look for   agw.ai.guardrails=[{"phase": "request", "guard": "regex", "action": "reject"}]
+# TWEAK:    change `action: Reject` to `Mask`, push, wait ~20 s (the proxy needs a moment to pick it up), and retry.
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
 metadata:

@@ -1,3 +1,6 @@
+# grafana.home.arpa -> the Grafana Service that kube-prometheus-stack installs (namespace "monitoring").
+# Same shape as ../argocd/httproute.yaml (read the comments there). The route must live in the same
+# namespace as its target Service, which is why this one is in "monitoring".
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

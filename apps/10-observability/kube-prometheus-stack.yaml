@@ -1,3 +1,5 @@
+# Prometheus (collects metrics) + Grafana (dashboards). Wave 1 because other apps ship monitors/dashboards for it.
+# podMonitorSelectorNilUsesHelmValues=false makes Prometheus scrape EVERY PodMonitor, not just ones labelled for this release.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

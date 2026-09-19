@@ -1,3 +1,15 @@
+# An HTTPRoute is one routing rule: "requests for THIS hostname go to THAT service".
+# This is the simplest example; the other routes in the repo have the same shape.
+#
+#   parentRefs   which Gateway (front door) this rule plugs into: "agentgateway-proxy" (platform/networking/gateway),
+#                and "sectionName: http" = its port-80 listener.
+#   hostnames    the URL host this rule matches. The DNS server (k8s-gateway) reads this list too, so
+#                argocd.home.arpa starts resolving to the nodes automatically. No hosts-file needed.
+#   rules        PathPrefix "/" = match every path.
+#   backendRefs  where to send it: the Service "argocd-server", port 80, in this route's own namespace (argocd).
+#
+# Argo CD normally redirects HTTP to HTTPS. The Ansible argocd-bootstrap role sets "server.insecure" so it answers
+# plain HTTP here instead (the gateway is the only thing talking to it).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

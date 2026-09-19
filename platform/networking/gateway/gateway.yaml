@@ -1,15 +1,26 @@
-# The agentgateway controller owns the "agentgateway" GatewayClass and provisions the proxy for this Gateway.
+# THE FRONT DOOR of the cluster.
+#
+# A Gateway is a listener: "accept HTTP traffic on port 80". By itself it sends traffic nowhere.
+# HTTPRoutes (see ../routes/ and workloads/*/route.yaml) attach to it and say "this hostname -> that service".
+#
+# What actually happens when this is applied:
+#   1. gatewayClassName is "agentgateway", so the agentgateway controller (apps/00-platform/agentgateway.yaml)
+#      notices this Gateway and starts a proxy pod for it.
+#   2. It also creates a Service of type LoadBalancer named after this Gateway ("agentgateway-proxy").
+#   3. k3s's built-in load balancer (ServiceLB) then opens port 80 on every node's IP.
+# So http://<any-node-ip>:80 lands on that proxy, and the proxy decides where each request goes.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: agentgateway-proxy
   namespace: agentgateway-system
 spec:
-  gatewayClassName: agentgateway
+  gatewayClassName: agentgateway   # which gateway software runs this door (created by the controller)
   listeners:
-    - name: http
-      protocol: HTTP
+    - name: http                   # routes point at this name with "sectionName: http"
+      protocol: HTTP               # plain HTTP, no TLS (fine on a home LAN)
       port: 80
       allowedRoutes:
         namespaces:
-          from: All
+          from: All                # routes from ANY namespace may use this door (argocd, monitoring, ai, podinfo-*).
+                                   # "Same" would only allow routes living in agentgateway-system.

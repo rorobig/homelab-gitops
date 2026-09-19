@@ -1,4 +1,15 @@
-# Tells agentgateway that this is an LLM (OpenAI-compatible API). It forces the model, so clients can send any model name.
+# WHAT THIS IS: the description of an AI service the gateway can send prompts to.
+#
+# A normal Kubernetes Service knows nothing about AI. An AgentgatewayBackend tells agentgateway
+# "this destination is an LLM that speaks the OpenAI API". That is what unlocks the AI features:
+# counting tokens, the prompt guard (guard.yaml), prompt rewriting (pirate.yaml), model override...
+#
+#   provider.openai   the API format. Ollama (ollama.yaml) speaks the OpenAI chat format, so we use "openai".
+#   openai.model      FORCE this model on every request. A client can send any model name ("gpt-4", "x");
+#                     the gateway swaps it for this one before forwarding. (You can see it in the reply's "model".)
+#   host / port       where the LLM really lives: the "ollama" Service in the "ai" namespace.
+#
+# This object only says WHERE the LLM is. WHO can reach it is route.yaml; extra rules on top are policies (guard.yaml).
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:

@@ -1,3 +1,5 @@
+# The root Application ("app of apps"): watches the apps/ folder and creates one Argo CD Application per file there.
+# This is the only thing applied by hand (the Ansible argocd-bootstrap role does it); everything else follows from git.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

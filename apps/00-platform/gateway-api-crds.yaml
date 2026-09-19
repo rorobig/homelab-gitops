@@ -1,3 +1,5 @@
+# The Kubernetes Gateway API definitions (Gateway, HTTPRoute, ...). Kubernetes doesn't ship these, and every gateway
+# resource in this repo needs them, so this syncs first (wave 0).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

@@ -1,3 +1,5 @@
+# Deploys the plain HTTPRoutes (Argo CD, Grafana) from platform/networking/routes/. Each route lives in the
+# namespace of the service it points at, so it must sync after those namespaces exist.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

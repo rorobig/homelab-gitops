@@ -1,3 +1,4 @@
+# Certificate manager. Nothing uses it yet: it is here because Kargo needs it. Safe to delete until you install Kargo.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

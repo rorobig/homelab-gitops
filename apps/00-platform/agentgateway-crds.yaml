@@ -1,3 +1,5 @@
+# agentgateway's own resource types (AgentgatewayBackend, AgentgatewayPolicy). Must exist before the controller
+# and before anything in workloads/llm uses them.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

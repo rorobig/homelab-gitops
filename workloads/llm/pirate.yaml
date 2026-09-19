@@ -1,5 +1,11 @@
-# Magic #1: the gateway rewrites the request. The caller sends a plain question to pirate.home.arpa;
-# agentgateway prepends a system prompt before it reaches the same local model. No app change needed.
+# DEMO "the gateway rewrites your request": pirate.home.arpa.
+# Ask llm.home.arpa and pirate.home.arpa the same question: same model, but the pirate one answers like a pirate.
+# The caller sent a plain question; the gateway added a hidden instruction. No app was changed.
+#
+# Three objects, top to bottom:
+#
+# 1) A second Backend pointing at the SAME Ollama. Policies attach to a Backend, so a second Backend is how we
+#    give the same model a different personality without touching llm.home.arpa.
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
@@ -12,6 +18,9 @@ spec:
       host: ollama.ai.svc.cluster.local
       port: 11434
 ---
+# 2) A policy for that backend. `prompt.prepend` inserts a message at the START of every conversation before it is
+#    forwarded. role "system" is the instruction channel a model treats as its rules; the user never sees it.
+#    (There is also `append`, which adds a message at the end.)
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
 metadata:
@@ -28,6 +37,7 @@ spec:
           - role: system
             content: "You are a grumpy pirate. Answer in one or two sentences, always in pirate speak, and mention the sea."
 ---
+# 3) The URL: pirate.home.arpa -> that backend. (DNS for the name appears automatically.)
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
