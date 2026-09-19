@@ -8,4 +8,4 @@ service:
 gateway:
   enabled: true
   gatewayClassName: solo-agent
-  gatewayNamespace: traefik
+  gatewayNamespace: solo

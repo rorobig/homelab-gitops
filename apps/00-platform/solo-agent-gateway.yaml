@@ -13,7 +13,7 @@ spec:
     path: platform/networking/solo-agent-gateway
   destination:
     server: https://kubernetes.default.svc
-    namespace: solo-agent-gateway
+    namespace: solo
   syncPolicy:
     automated:
       prune: true

@@ -6,7 +6,7 @@ metadata:
 spec:
   parentRefs:
     - name: solo-agent-gateway
-      namespace: traefik
+      namespace: solo
       sectionName: http
   hostnames:
     - keycloak.home.arpa
