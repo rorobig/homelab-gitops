@@ -1,24 +1,27 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: routes
+  name: cert-manager
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "11"
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   project: default
   source:
-    repoURL: https://github.com/rorobig/homelab-gitops.git
-    targetRevision: main
-    path: platform/networking/routes
-    directory:
-      recurse: true
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.21.2
+    helm:
+      valuesObject:
+        crds:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: cert-manager
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true

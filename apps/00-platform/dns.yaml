@@ -1,0 +1,30 @@
+# Serves *.home.arpa for the LAN: answers every HTTPRoute hostname with the node IPs, forwards everything else upstream.
+# Exposed on :53 of every node by k3s ServiceLB. Point your PC's DNS at any node IP.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+spec:
+  project: default
+  source:
+    repoURL: https://k8s-gateway.kryptonian.kapsi.fi/
+    chart: k8s-gateway
+    targetRevision: 3.7.3
+    helm:
+      valuesObject:
+        domain: home.arpa
+        watchedResources: ["HTTPRoute"]
+        service:
+          useTcp: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dns
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

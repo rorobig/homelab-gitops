@@ -1,0 +1,36 @@
+# One Application per environment (podinfo-dev / -staging / -prod), each from its own overlay.
+# This is the promotion target layout for Kargo.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: podinfo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - env: dev
+          - env: staging
+          - env: prod
+  template:
+    metadata:
+      name: 'podinfo-{{.env}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/rorobig/homelab-gitops.git
+        targetRevision: main
+        path: 'workloads/podinfo/overlays/{{.env}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: 'podinfo-{{.env}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
