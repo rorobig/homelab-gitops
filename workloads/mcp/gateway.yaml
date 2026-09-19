@@ -1,0 +1,41 @@
+# Puts the MCP server behind agentgateway, at  http://mcp.home.arpa/mcp
+#
+# Why bother, when clients could talk to the server directly? Because now the gateway sits in the middle of every
+# tool call: it can list and combine tools from SEVERAL servers behind one URL, and it sees (and counts) every call.
+# That is what fills the "MCP" panels in the Grafana dashboard. Auth and policies can be added here later without
+# touching the server.
+#
+# 1) The backend. `mcp` (instead of `ai`) means "this destination is an MCP server, not an LLM".
+#    Each entry in `targets` is one MCP server the gateway will talk to; you can list several and clients see the
+#    tools of all of them combined.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: mcp-demo
+spec:
+  mcp:
+    targets:
+      - name: demo
+        static:
+          host: mcp-demo.ai.svc.cluster.local
+          port: 8000
+          path: /mcp
+          protocol: StreamableHTTP   # the other option is SSE (an older MCP transport)
+---
+# 2) The URL. Same shape as every other route; the target is the MCP backend above.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mcp
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+      sectionName: http
+  hostnames:
+    - mcp.home.arpa
+  rules:
+    - backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: mcp-demo

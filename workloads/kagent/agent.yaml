@@ -1,0 +1,101 @@
+# The agent, in four pieces: a brain (model), hands (tools), a tool list to choose from, and instructions.
+# kagent turns the Agent below into a running pod; you talk to it in the kagent UI (http://kagent.home.arpa).
+#
+# 1) The BRAIN: a model config. kagent talks to it as if it were OpenAI, but the address is our agentgateway,
+#    so every thought the agent has passes through the gateway (logged, counted, guarded, failover-protected).
+#    The gateway picks the real model (smart 1.5B, tiny 0.5B as fallback), so "model" here is just a label.
+apiVersion: kagent.dev/v1alpha2
+kind: ModelConfig
+metadata:
+  name: gateway-llm
+  namespace: kagent
+spec:
+  provider: OpenAI
+  model: qwen2.5:1.5b
+  apiKeySecret: gateway-placeholder-key
+  apiKeySecretKey: API_KEY
+  openAI:
+    baseUrl: http://agentgateway-proxy.agentgateway-system.svc.cluster.local/v1
+---
+# kagent's OpenAI client insists on an API key. Our gateway doesn't check one, so this is a placeholder, not a secret.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gateway-placeholder-key
+  namespace: kagent
+stringData:
+  API_KEY: not-used
+---
+# 2) The HANDS: where the agent's tools live. This is the combined MCP endpoint on the gateway
+#    (our demo tools + kagent's read-only Kubernetes tools; see gateway.yaml).
+apiVersion: kagent.dev/v1alpha2
+kind: RemoteMCPServer
+metadata:
+  name: gateway-mcp
+  namespace: kagent
+spec:
+  description: Demo tools and read-only Kubernetes tools, combined by agentgateway
+  url: http://agentgateway-proxy.agentgateway-system.svc.cluster.local/mcp
+  protocol: STREAMABLE_HTTP
+  timeout: 30s
+  sseReadTimeout: 5m0s
+---
+# 3) The AGENTS. Each one gets a SHORT list of tools (`toolNames`). The gateway offers 13, but a small model picks
+#    badly from a long list, so every agent only gets the tools for its one job. (We tried one agent with all five:
+#    it mixed up the Kubernetes tools. One job + one worked example per agent is what makes a 1.5B model reliable.)
+#
+# Agent A: the fun one. Dice and a cow.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: fun-agent
+  namespace: kagent
+spec:
+  description: Rolls dice and draws a colourful cow.
+  type: Declarative
+  declarative:
+    modelConfig: gateway-llm
+    systemMessage: |
+      You are a playful assistant with two tools.
+      - demo_roll_dice rolls a die. It takes sides (a number). Example: {"sides": 20}
+      - demo_cowsay draws a cow saying something. It takes text and color (red, green, yellow, blue, magenta, cyan
+        or rainbow). Example: {"text": "hello", "color": "green"}
+      Call the right tool first, then reply with one short sentence. If the tool draws a picture, just say it is done.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: gateway-mcp
+          toolNames:
+            - demo_roll_dice
+            - demo_cowsay
+---
+# Agent B: the useful one. Looks at the cluster, read-only, through kagent's built-in Kubernetes tools.
+# ONE tool and three worked examples, because that is what a small model can handle.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: cluster-agent
+  namespace: kagent
+spec:
+  description: Looks at what is running in this cluster (read-only).
+  type: Declarative
+  declarative:
+    modelConfig: gateway-llm
+    systemMessage: |
+      You look at a Kubernetes cluster. You can only read, never change anything.
+      You have ONE tool: k8s_k8s_get_resources. It needs resource_type and, for namespaced things, namespace.
+      Examples:
+        "list the pods in the ai namespace"  -> k8s_k8s_get_resources {"resource_type": "pods", "namespace": "ai"}
+        "how many nodes are there"           -> k8s_k8s_get_resources {"resource_type": "nodes"}
+        "what deployments run in monitoring" -> k8s_k8s_get_resources {"resource_type": "deployments", "namespace": "monitoring"}
+      Always call the tool first, then answer in two or three short sentences using only what it returned.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: gateway-mcp
+          toolNames:
+            - k8s_k8s_get_resources

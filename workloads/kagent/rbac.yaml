@@ -1,0 +1,24 @@
+# The built-in Kubernetes tool server is deliberately read-only (see apps/30-agents/kagent.yaml), and its read-only
+# role does not include nodes, so "how many nodes are there?" failed. Reading node names and status is harmless,
+# so this adds exactly that and nothing else.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kagent-tools-read-nodes
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kagent-tools-read-nodes
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kagent-tools-read-nodes
+subjects:
+  - kind: ServiceAccount
+    name: kagent-tools
+    namespace: kagent

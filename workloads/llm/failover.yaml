@@ -1,0 +1,81 @@
+# DEMO "failover": failover.home.arpa
+# One URL, two models. The gateway uses the smart one (1.5B) while it is healthy, and quietly switches to the tiny
+# one (0.5B) when it is not. The caller never notices, except that the reply's "model" field changes.
+#
+# Try it:  ./scripts/llm-demo.sh failover-demo      (or by hand, see the README)
+#
+# Failover is NOT automatic just because two providers are listed. We tested it: with only the priority groups,
+# a dead primary simply returned 503. It takes all three pieces below working together.
+#
+# 1) The backend: two "groups" in priority order. Group 1 is tried first; group 2 is the fallback.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: smart
+spec:
+  ai:
+    groups:
+      - providers:
+          - name: big                       # names must be unique across all groups
+            openai:
+              model: qwen2.5:1.5b
+            host: ollama-big.ai.svc.cluster.local
+            port: 11434
+      - providers:
+          - name: small
+            openai:
+              model: qwen2.5:0.5b
+            host: ollama.ai.svc.cluster.local
+            port: 11434
+---
+# 2) Health policy: after ONE failed request the gateway stops sending traffic to that provider for 30 seconds
+#    ("evicts" it). Without this it would keep hammering the dead primary forever.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: smart-health
+spec:
+  targetRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: smart
+  backend:
+    health:
+      eviction:
+        consecutiveFailures: 1
+        duration: 30s
+---
+# 3) Retry policy: the request that hit the dead primary is tried again (up to 2 attempts), and by then the
+#    primary has been evicted, so the retry lands on the fallback. Without this, that one unlucky request
+#    would just fail. In the proxy log you'll see `retry.attempt=2` on it.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: smart-retry
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: failover
+  traffic:
+    retry:
+      attempts: 2
+      codes: [502, 503, 504]
+---
+# The URL.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: failover
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+      sectionName: http
+  hostnames:
+    - failover.home.arpa
+  rules:
+    - backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: smart

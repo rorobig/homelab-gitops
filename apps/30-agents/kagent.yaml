@@ -1,0 +1,66 @@
+# kagent itself: controller + UI + database, trimmed to what a small homelab can carry.
+#
+# The chart turns on a LOT by default (10 ready-made agents for Kubernetes, Istio, Cilium, Helm..., an MCP controller,
+# a Grafana tool server). Each agent is its own pod, and your nodes have 4 GB of RAM, so everything we don't use is
+# switched off below. What stays: the controller (runs agents), the UI, a small Postgres, and the built-in tool server.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kagent
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "22"
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/kagent-dev/kagent/helm
+    chart: kagent
+    targetRevision: 0.10.1
+    helm:
+      valuesObject:
+        # The chart's own default model (unused by our agent, which uses "gateway-llm" from workloads/kagent).
+        # It needs to point somewhere valid, so: the local Ollama, directly.
+        providers:
+          default: ollama
+          ollama:
+            provider: Ollama
+            model: qwen2.5:1.5b
+            config:
+              host: ollama-big.ai.svc.cluster.local:11434
+
+        # --- built-in tool server (an MCP server with Kubernetes tools) ---
+        # SAFETY: by default this gets cluster-admin, and an AI decides what to run. So:
+        #   rbac.readOnly  -> the Kubernetes permissions are get/list/watch only
+        #   --read-only    -> the server itself refuses tools that change things
+        #   enabledTools   -> only the Kubernetes tools (not helm, istio, cilium, argo, ...)
+        kagent-tools:
+          rbac:
+            readOnly: true
+          tools:
+            loglevel: info
+            enabledTools: [k8s]
+            args: ["--read-only"]
+
+        # --- everything else off, to save memory ---
+        kmcp: {enabled: false}
+        grafana-mcp: {enabled: false}
+        k8s-agent: {enabled: false}
+        kgateway-agent: {enabled: false}
+        istio-agent: {enabled: false}
+        promql-agent: {enabled: false}
+        observability-agent: {enabled: false}
+        argo-rollouts-agent: {enabled: false}
+        helm-agent: {enabled: false}
+        cilium-policy-agent: {enabled: false}
+        cilium-manager-agent: {enabled: false}
+        cilium-debug-agent: {enabled: false}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kagent
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

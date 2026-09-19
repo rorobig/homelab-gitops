@@ -1,0 +1,23 @@
+# Our own kagent setup (workloads/kagent/): the model, the tools, the agent, its UI route, and the gateway wiring.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kagent-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rorobig/homelab-gitops.git
+    targetRevision: main
+    path: workloads/kagent
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kagent
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

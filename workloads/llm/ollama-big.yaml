@@ -1,0 +1,91 @@
+# A SECOND model server, only here so the failover demo (failover.yaml) has something to fail.
+# Same idea as ollama.yaml, but it runs a bigger, smarter model (qwen2.5:1.5b, ~1 GB).
+#
+# Two details that matter for the demo:
+#  - There is NO `replicas:` line on purpose. That means Argo CD doesn't manage the replica count, so when you
+#    run `kubectl scale deploy/ollama-big --replicas=0` to simulate an outage, Argo does not "fix" it back.
+#  - The model is stored on a small disk (the PersistentVolumeClaim below), so scaling 0 -> 1 doesn't download
+#    it again. Recovery takes seconds, not minutes.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-big-models
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 4Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-big
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ollama-big
+  template:
+    metadata:
+      labels:
+        app: ollama-big
+    spec:
+      # Keep this off the control-plane node: that node also runs k3s itself and has no spare memory, and this model
+      # keeps ~1.5 GB loaded. (Its storage is pinned to whichever node it first runs on, so decide this early.)
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+      containers:
+        - name: ollama
+          image: ollama/ollama:0.34.2
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              ollama serve &
+              until ollama list >/dev/null 2>&1; do sleep 1; done
+              ollama pull qwen2.5:1.5b
+              wait
+          env:
+            - name: OLLAMA_HOST
+              value: 0.0.0.0:11434
+            - name: OLLAMA_KEEP_ALIVE
+              value: 24h
+          ports:
+            - name: http
+              containerPort: 11434
+          # Ready only once the model is downloaded (the first start takes a few minutes).
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "ollama list | grep -q qwen2.5:1.5b"]
+            periodSeconds: 10
+            failureThreshold: 90
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ollama-big-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-big
+spec:
+  selector:
+    app: ollama-big
+  ports:
+    - name: http
+      port: 11434
+      targetPort: http

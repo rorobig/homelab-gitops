@@ -1,0 +1,149 @@
+# A tiny MCP server, so there is something for the gateway to front. (Nothing here is agentgateway-specific.)
+#
+# MCP ("Model Context Protocol") is a standard way for AI apps to discover and call TOOLS: "what can you do?"
+# -> a list of tools, then "run this one with these arguments". Desktop AI apps, IDE assistants and agents all
+# speak it. This server offers a few silly tools so you can see the whole flow without any real integration.
+#
+# The Python code is stored in the ConfigMap below and mounted into a stock python image, so there is
+# nothing to build. On start the pod installs the MCP SDK (pinned), which takes ~20 seconds.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-demo-server
+data:
+  server.py: |
+    import datetime
+    import random
+    import textwrap
+
+    from mcp.server.fastmcp import FastMCP
+
+    # Serves the MCP "streamable HTTP" protocol on port 8000, at the path /mcp
+    mcp = FastMCP("homelab-demo", host="0.0.0.0", port=8000)
+
+
+    @mcp.tool()
+    def roll_dice(sides: int = 6) -> str:
+        """Roll a die with the given number of sides."""
+        return f"You rolled a {random.randint(1, max(2, sides))} (d{sides})"
+
+
+    @mcp.tool()
+    def add(a: float, b: float) -> float:
+        """Add two numbers."""
+        return a + b
+
+
+    # ANSI colour codes: the text result contains them and your terminal turns them into colours.
+    COLORS = {"red": 31, "green": 32, "yellow": 33, "blue": 34, "magenta": 35, "cyan": 36}
+    RAINBOW = [31, 33, 32, 36, 34, 35]
+    COW = r"""        \   ^__^
+             \  (oo)\_______
+                (__)\       )\/\
+                    ||----w |
+                    ||     ||""".splitlines()
+
+
+    def paint(line: str, code: int) -> str:
+        return f"\x1b[{code}m{line}\x1b[0m"
+
+
+    @mcp.tool()
+    def cowsay(text: str, color: str = "rainbow") -> str:
+        """A cow says your text, in colour. color: red, green, yellow, blue, magenta, cyan or rainbow."""
+        lines = textwrap.wrap(text, 36) or [""]
+        width = max(len(line) for line in lines)
+        if len(lines) == 1:
+            body = [f"< {lines[0]} >"]
+        else:
+            body = ["/ " + lines[0].ljust(width) + " \\"]
+            body += ["| " + line.ljust(width) + " |" for line in lines[1:-1]]
+            body += ["\\ " + lines[-1].ljust(width) + " /"]
+        bubble = [" " + "_" * (width + 2)] + body + [" " + "-" * (width + 2)]
+        picture = bubble + COW
+        if color == "rainbow":
+            # a different colour on every line
+            return "\n".join(paint(row, RAINBOW[i % len(RAINBOW)]) for i, row in enumerate(picture))
+        code = COLORS.get(color.lower())
+        if code is None:
+            return f"Unknown colour '{color}'. Try: {', '.join(COLORS)} or rainbow."
+        return "\n".join([*bubble, *(paint(row, code) for row in COW)])
+
+
+    @mcp.tool()
+    def time_now() -> str:
+        """Current time (UTC) on the server."""
+        return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+
+
+    @mcp.tool()
+    def homelab_fact() -> str:
+        """A random fact about this homelab."""
+        return random.choice([
+            "This cluster has 4 nodes and none of them has more than 4 GB of RAM.",
+            "Every URL in this cluster goes through one agentgateway proxy on port 80.",
+            "DNS for *.home.arpa is answered by a pod that reads the HTTPRoutes.",
+            "The credit-card guard has never once seen a real credit card. Probably.",
+        ])
+
+
+    if __name__ == "__main__":
+        mcp.run(transport="streamable-http")
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-demo
+  template:
+    metadata:
+      labels:
+        app: mcp-demo
+      annotations:
+        # The pod only reads the code when it starts. After editing server.py above, bump this number so Argo CD
+        # restarts the pod with the new code (a ConfigMap change alone does not restart it).
+        code-version: "2"
+    spec:
+      containers:
+        - name: server
+          image: python:3.12-slim
+          command: ["/bin/sh", "-c"]
+          args: ["pip install --no-cache-dir --quiet mcp==1.30.0 && exec python /app/server.py"]
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: code
+              mountPath: /app
+      volumes:
+        - name: code
+          configMap:
+            name: mcp-demo-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-demo
+spec:
+  selector:
+    app: mcp-demo
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

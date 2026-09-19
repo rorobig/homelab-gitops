@@ -1,0 +1,63 @@
+# How agents inside the cluster reach the gateway. Two things are set up here:
+#
+# 1) A hostname that works INSIDE the cluster. The other routes use *.home.arpa names, which only exist for your PC.
+#    Pods talk to the gateway through its Kubernetes Service, so their requests carry that Service's name as the
+#    hostname. This route answers to that name.
+#
+# 2) One MCP endpoint that COMBINES several tool servers ("federation"): our demo tools (roll_dice, cowsay, ...)
+#    AND kagent's built-in read-only Kubernetes tools (kubectl_get, kubectl_logs, ...). The agent sees one list,
+#    and every call is logged by the gateway with the tool name.
+#
+# Everything an agent does therefore goes through agentgateway: /v1 = its thinking (the LLM), /mcp = its actions (tools).
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: agent-tools
+  namespace: ai
+spec:
+  mcp:
+    targets:
+      - name: demo
+        static:
+          host: mcp-demo.ai.svc.cluster.local
+          port: 8000
+          path: /mcp
+          protocol: StreamableHTTP
+      - name: k8s
+        static:
+          host: kagent-tools.kagent.svc.cluster.local
+          port: 8084
+          path: /mcp
+          protocol: StreamableHTTP
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: agents
+  namespace: ai
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+      sectionName: http
+  hostnames:
+    - agentgateway-proxy.agentgateway-system.svc.cluster.local
+  rules:
+    # the agent's brain: the OpenAI-style LLM API -> the "smart" backend (big model, tiny fallback)
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1
+      backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: smart
+    # the agent's hands: MCP tools -> both tool servers combined
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mcp
+      backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: agent-tools

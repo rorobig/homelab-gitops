@@ -1,0 +1,17 @@
+# The kagent web UI: http://kagent.home.arpa  (chat with the agent, see its tool calls)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kagent-ui
+  namespace: kagent
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+      sectionName: http
+  hostnames:
+    - kagent.home.arpa
+  rules:
+    - backendRefs:
+        - name: kagent-ui
+          port: 8080
