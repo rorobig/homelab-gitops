@@ -1,0 +1,17 @@
+# http://llm.home.arpa/v1/chat/completions  ->  agentgateway  ->  ollama
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: llm
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+      sectionName: http
+  hostnames:
+    - llm.home.arpa
+  rules:
+    - backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: ollama

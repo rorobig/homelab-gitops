@@ -1,0 +1,12 @@
+# Tells agentgateway that this is an LLM (OpenAI-compatible API). It forces the model, so clients can send any model name.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: ollama
+spec:
+  ai:
+    provider:
+      openai:
+        model: qwen2.5:0.5b
+      host: ollama.ai.svc.cluster.local
+      port: 11434

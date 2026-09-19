@@ -1,21 +1,20 @@
+# LLM demo: local model (Ollama) behind agentgateway at http://llm.home.arpa, with a prompt guardrail.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: routes
+  name: llm
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "20"
 spec:
   project: default
   source:
     repoURL: https://github.com/rorobig/homelab-gitops.git
     targetRevision: main
-    path: platform/networking/routes
-    directory:
-      recurse: true
+    path: workloads/llm
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: ai
   syncPolicy:
     automated:
       prune: true

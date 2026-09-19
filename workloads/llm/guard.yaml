@@ -1,0 +1,21 @@
+# Guardrail at the gateway: prompts containing a credit card number are rejected before they reach the model.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: llm-guard
+spec:
+  targetRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: ollama
+  backend:
+    ai:
+      promptGuard:
+        request:
+          - regex:
+              action: Reject
+              builtins:
+                - CreditCard
+            response:
+              statusCode: 403
+              message: "Blocked by agentgateway: prompt contains a credit card number."

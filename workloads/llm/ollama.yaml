@@ -1,0 +1,65 @@
+# A tiny local LLM so the demo needs no API key. Swap the model here (and in backend.yaml) to try others.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:0.34.2
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              ollama serve &
+              until ollama list >/dev/null 2>&1; do sleep 1; done
+              ollama pull qwen2.5:0.5b
+              wait
+          env:
+            - name: OLLAMA_HOST
+              value: 0.0.0.0:11434
+            - name: OLLAMA_KEEP_ALIVE
+              value: 24h
+          ports:
+            - name: http
+              containerPort: 11434
+          # Ready only once the model has been downloaded.
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "ollama list | grep -q qwen2.5:0.5b"]
+            periodSeconds: 10
+            failureThreshold: 60
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+      volumes:
+        - name: models
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+spec:
+  selector:
+    app: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: http
