@@ -1,0 +1,19 @@
+# Same as the agentgateway chart's proxy PodMonitor, plus podTargetLabels: the chart's dashboard filters on
+# gateway_networking_k8s_io_gateway_name, which only exists if the pod label is copied onto the metrics.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: agentgateway-proxy-labeled
+  namespace: agentgateway-system
+spec:
+  selector:
+    matchExpressions:
+      - key: gateway.networking.k8s.io/gateway-class-name
+        operator: In
+        values: ["agentgateway"]
+  podTargetLabels:
+    - gateway.networking.k8s.io/gateway-name
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
