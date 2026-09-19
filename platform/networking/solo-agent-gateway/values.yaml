@@ -1,0 +1,11 @@
+image:
+  repository: soloio/agent-gateway
+  tag: latest
+replicaCount: 1
+service:
+  type: ClusterIP
+  port: 8000
+gateway:
+  enabled: true
+  gatewayClassName: solo-agent
+  gatewayNamespace: traefik

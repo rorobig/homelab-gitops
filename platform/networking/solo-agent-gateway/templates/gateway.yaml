@@ -1,0 +1,17 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: solo-agent-gateway
+  namespace: {{ .Values.gateway.gatewayNamespace | default "traefik" }}
+spec:
+  gatewayClassName: {{ .Values.gateway.gatewayClassName }}
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: {{ .Values.service.port }}
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+{{- end }}

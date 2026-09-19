@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "solo-agent-gateway.fullname" . }}
+  labels:
+    app: {{ include "solo-agent-gateway.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "solo-agent-gateway.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "solo-agent-gateway.fullname" . }}
+    spec:
+      containers:
+        - name: agent-gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
