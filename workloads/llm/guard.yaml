@@ -1,14 +1,16 @@
 # WHAT THIS IS: a "prompt guard", a bouncer at the door of the AI.
 #
-# Every prompt sent to llm.home.arpa passes through the gateway before reaching the model. The guard reads the
-# prompt on the way through and can act BEFORE the model ever sees it. The rule lives in the gateway, so no app
-# has to implement it, and no app can forget to.
+# Every prompt sent to llm.home.arpa, failover.home.arpa or an agent's /v1 calls (all three end at the "ollama" or
+# "smart" backend) passes through the gateway before reaching the model. The guard reads the prompt on the way
+# through and can act BEFORE the model ever sees it. The rule lives in the gateway, so no app has to implement it,
+# and no app can forget to. (pirate.home.arpa uses its own backend, ollama-pirate, and is not guarded.)
 #
 # An AgentgatewayPolicy means "attach extra behaviour to something else". It does nothing on its own;
 # targetRefs says what it is attached to.
 #
-#   targetRefs            attach to the AgentgatewayBackend named "ollama" (backend.yaml),
-#                         so every request going to that backend is checked.
+#   targetRefs            attach to the AgentgatewayBackends named "ollama" (backend.yaml) and "smart"
+#                         (failover.yaml), so every request going to either backend is checked. A policy only
+#                         guards what it targets: a new backend needs its own line here.
 #   backend.ai.promptGuard  the AI-specific checks:
 #     request:            checks on the PROMPT (what the user sends).
 #                         (A matching `response:` list would check the model's ANSWER; not used here.)
@@ -36,6 +38,9 @@ spec:
     - group: agentgateway.dev
       kind: AgentgatewayBackend
       name: ollama
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: smart
   backend:
     ai:
       promptGuard:

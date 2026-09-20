@@ -1,6 +1,6 @@
 # homelab-gitops
 
-A small Kubernetes cluster at home, set up as a **playground for AI gateways**. It runs a tiny AI model, puts
+A small Kubernetes cluster at home, set up as a **playground for AI gateways**. It runs two tiny AI models (a 1.5B and a 0.5B), puts
 **agentgateway** in front of it, and shows what a gateway can do with AI traffic: watch it, filter it, rewrite it.
 It also has a demo app in three environments, ready for **Kargo** (promoting a version dev → staging → prod).
 
@@ -22,7 +22,7 @@ to `main`, and the cluster changes to match.**
 | **MCP** | "Model Context Protocol": a standard way for AI apps to discover and call *tools* ("roll a die", "look up a ticket"). Agents and AI assistants speak it. |
 | **Agent** | An AI model that keeps deciding "which tool do I call next?" until it can answer. A loop of think, act, think. |
 | **kagent** | An open-source (Apache 2.0) framework for running agents on Kubernetes. You describe an agent in YAML; it runs it. |
-| **LLM / model** | The AI. Here a small one (`qwen2.5:0.5b`) run by **Ollama**. |
+| **LLM / model** | The AI. Here two small ones run by **Ollama**: `qwen2.5:1.5b` (the "smart" one) and `qwen2.5:0.5b` (the tiny one; it answers `llm.home.arpa` and is the failover fallback). |
 | **Token** | The unit AI is measured in (roughly ¾ of a word). Gateways count them to track usage and cost. |
 | **DNS** | The phone book that turns `llm.home.arpa` into an IP address. We run our own inside the cluster. |
 
@@ -41,6 +41,11 @@ to `main`, and the cluster changes to match.**
   argocd.home.arpa  grafana.home.arpa  podinfo-{dev,staging,prod}   llm.home.arpa                 pirate.home.arpa
   (Argo CD UI)      (dashboards)       .home.arpa (demo app x3)     (the AI, with a guard)        (same AI + a hidden
                                                                                                     "pirate" instruction)
+
+  ...and the same door also serves:
+  failover.home.arpa           mcp.home.arpa/mcp       kagent.home.arpa       agents, from inside the cluster
+  (smart AI + tiny fallback,   (the tool server)       (agent chat UI)        (Service name, not *.home.arpa):
+   with the guard)                                                             /v1 = their AI (smart), /mcp = their tools
 ```
 
 Every URL goes through the same front door. A URL exists because an HTTPRoute says so. Add a route, get a URL.
@@ -86,6 +91,8 @@ replaced it (`openai.model` in `workloads/llm/backend.yaml`). The token counts c
 **You see:** `HTTP/1.1 403 Forbidden` and `Blocked by agentgateway: prompt contains a credit card number.`
 **Why:** `workloads/llm/guard.yaml` is a **prompt guard**: a rule at the gateway that reads every prompt before the
 model does. This one looks for credit card numbers (a ready-made pattern) and rejects. The model was never called.
+It is attached to two backends, so it covers `llm.home.arpa`, `failover.home.arpa` and the agents' AI calls; the
+pirate route has its own backend and is not guarded (a policy only guards what its `targetRefs` name).
 The file is heavily commented; start there. **Try:** change `action: Reject` to `Mask`, push, wait ~20 s, run it
 again. The request now goes through, with the card number hidden from the model.
 
@@ -108,7 +115,8 @@ kubectl -n agentgateway-system logs deploy/agentgateway-proxy -f     # in anothe
 - **Grafana** (`http://grafana.home.arpa`, login `admin` / `prom-operator`) → dashboard **Agentgateway**:
   tokens by model, request rate, latency. Time Range "Last 15 minutes" works best.
 - **Streaming:** add `"stream": true` to a request and the *Time To First Token* panel starts filling in.
-- Panels for MCP calls, tool calls and cost stay empty: that's traffic we haven't generated (yet).
+- The **MCP** row (MCP calls, tool calls) fills in once you run demo 6 or chat with an agent (demo 7). Cost stays
+  empty: that's traffic we haven't generated (yet).
 
 ### 5. Failover: the AI survives an outage
 ```bash
