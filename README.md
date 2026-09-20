@@ -151,6 +151,7 @@ Open **http://kagent.home.arpa**, skip the first-run wizard, and pick an agent:
 | Agent | Try asking | What it uses |
 |---|---|---|
 | `cluster-agent` | "How many nodes does the cluster have?" / "List the pods in the ai namespace" | kagent's built-in **read-only** Kubernetes tool |
+| `usage-agent` | "CPU usage per namespace" / "Top pods by memory in monitoring" | a **Prometheus query** tool (the same Prometheus Grafana reads). Read-only, over HTTP, so no Kubernetes permissions needed |
 | `fun-agent` | "Roll a 20-sided die" / "Make the cow say hello in cyan" | our demo tools from demo 6 |
 
 **What is an agent?** A loop. The model is given a question and a list of tools. It replies either with an answer or with
@@ -164,7 +165,7 @@ So the proxy log and Grafana show the agent's token usage and every tool it call
 `kubectl -n agentgateway-system logs deploy/agentgateway-proxy -f` while you chat.
 
 **Files:** `apps/30-agents/` installs kagent (trimmed down, see below); `workloads/kagent/` holds our setup, each file
-commented: `agent.yaml` (model, tools, the two agents), `gateway.yaml` (how agents reach the gateway), `rbac.yaml`,
+commented: `agent.yaml` (model, tools, the three agents), `gateway.yaml` (how agents reach the gateway), `rbac.yaml`,
 `route.yaml`.
 
 **Honest limits.** The model is small (1.5B). It is reliable when an agent has ONE job, one or two tools, and a worked
@@ -176,8 +177,10 @@ too weak to run an agent: expect empty or wrong answers until the big model is b
 good safety net for plain chat.
 
 **Safety.** An agent lets an AI decide what to run against your cluster, so: the Kubernetes tool server is set to
-read-only (both its permissions and the server itself), limited to `get`-style tools, and each agent only sees the few
-tools it needs. Don't loosen that casually.
+read-only (both its permissions and the server itself), limited to `get`-style Kubernetes tools plus Prometheus queries
+(read-only PromQL over HTTP, no Kubernetes permissions), and each agent only sees the few tools it needs. One caveat: the
+Prometheus tool takes the Prometheus address as an argument, so the model could point it at another in-cluster URL; it
+only ever sends read queries. Don't loosen any of this casually.
 
 ## Where to click
 

@@ -32,13 +32,14 @@ spec:
         # SAFETY: by default this gets cluster-admin, and an AI decides what to run. So:
         #   rbac.readOnly  -> the Kubernetes permissions are get/list/watch only
         #   --read-only    -> the server itself refuses tools that change things
-        #   enabledTools   -> only the Kubernetes tools (not helm, istio, cilium, argo, ...)
+        #   enabledTools   -> only the Kubernetes tools, plus the Prometheus query tools (CPU / memory usage, asked
+        #                     over HTTP, so they need no Kubernetes permissions); not helm, istio, cilium, argo, ...
         kagent-tools:
           rbac:
             readOnly: true
           tools:
             loglevel: info
-            enabledTools: [k8s]
+            enabledTools: [k8s, prometheus]
             args: ["--read-only"]
 
         # --- everything else off, to save memory ---

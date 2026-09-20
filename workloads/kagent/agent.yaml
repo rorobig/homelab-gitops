@@ -90,6 +90,8 @@ spec:
         "list the pods in the ai namespace"  -> k8s_k8s_get_resources {"resource_type": "pods", "namespace": "ai"}
         "how many nodes are there"           -> k8s_k8s_get_resources {"resource_type": "nodes"}
         "what deployments run in monitoring" -> k8s_k8s_get_resources {"resource_type": "deployments", "namespace": "monitoring"}
+      resource_type must be a real Kubernetes resource (pods, nodes, deployments, services...). CPU and memory usage
+      are NOT resources and you cannot see them: if asked for usage, say so in one sentence and do not call the tool.
       Always call the tool first, then answer in two or three short sentences using only what it returned.
     tools:
       - type: McpServer
@@ -99,3 +101,38 @@ spec:
           name: gateway-mcp
           toolNames:
             - k8s_k8s_get_resources
+---
+# Agent C: resource usage. The Kubernetes tool above only sees WHAT exists, not how busy it is. Usage lives in
+# Prometheus (already running for Grafana), and kagent's tool server can query it. One tool, worked PromQL examples:
+# a small model cannot invent PromQL, but it can copy one that is close to what was asked.
+# (The tool name has the gateway's "k8s_" prefix, like the one above: it is on the same tool server.)
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: usage-agent
+  namespace: kagent
+spec:
+  description: Reports CPU and memory usage per namespace or pod, from Prometheus (read-only).
+  type: Declarative
+  declarative:
+    modelConfig: gateway-llm
+    systemMessage: |
+      You report CPU and memory usage of a Kubernetes cluster. You can only read.
+      You have ONE tool: k8s_prometheus_query_tool. It needs two arguments:
+        query           a PromQL query
+        prometheus_url  always exactly http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+      Examples:
+        "CPU usage per namespace"       -> query: sum by (namespace) (rate(container_cpu_usage_seconds_total{container!=""}[5m]))
+        "memory usage per namespace"    -> query: sum by (namespace) (container_memory_working_set_bytes{container!=""})
+        "top pods by memory in monitoring" -> query: topk(5, sum by (pod) (container_memory_working_set_bytes{namespace="monitoring",container!=""}))
+      To use another namespace, change only the namespace value. CPU results are cores; memory results are bytes.
+      In the answer, convert bytes to MiB, round, and list the biggest few. Use only what the tool returned.
+      Always call the tool first, then answer in two or three short sentences.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: gateway-mcp
+          toolNames:
+            - k8s_prometheus_query_tool
