@@ -8,7 +8,9 @@ metadata:
   name: podinfo
   namespace: podinfo
 spec:
-  interval: 5m
+  # Written as "5m0s", not "5m": the API server normalizes it to that on write, and Argo CD's diff
+  # compares it as a plain string, so anything else here shows as permanent (harmless) drift.
+  interval: 5m0s
   subscriptions:
     - image:
         repoURL: ghcr.io/stefanprodan/podinfo
