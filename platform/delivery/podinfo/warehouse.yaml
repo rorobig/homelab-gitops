@@ -13,3 +13,10 @@ spec:
     - image:
         repoURL: ghcr.io/stefanprodan/podinfo
         semverConstraint: ">=6.0.0"
+        # These four are Kargo's own defaults -- written out explicitly because the API server fills
+        # them in on create whether we ask or not, and Argo CD's diff doesn't know that, so leaving
+        # them implicit here made this Warehouse permanently (harmlessly) show as OutOfSync.
+        imageSelectionStrategy: SemVer
+        strictSemvers: true
+        discoveryLimit: 20
+  freightCreationPolicy: Automatic
