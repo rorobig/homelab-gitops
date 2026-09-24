@@ -1,0 +1,224 @@
+# One Stage per environment. A Stage is "one step in the pipeline": it says which Freight it's allowed to
+# take (requestedFreight) and what to do with it when promoted (promotionTemplate). Read requestedFreight
+# first, top to bottom, to see the pipeline shape:
+#   dev.requestedFreight     -> sources.direct: true        (takes fresh Freight straight from the Warehouse)
+#   staging.requestedFreight -> sources.stages: [dev]        (only takes Freight that has already been in dev)
+#   prod.requestedFreight    -> sources.stages: [staging]    (only takes Freight that has already been in staging)
+# That chain *is* the promotion pipeline: dev -> staging -> prod. Nothing skips a step.
+#
+# Every promotionTemplate below does the same five things, only the paths/branch differ:
+#   1. git-clone this repo (the kustomize source) and the hydrated repo (the Argo CD-facing output)
+#   2. wipe this stage's old rendered output
+#   3. stamp the new image tag into the overlay, then `kustomize build` it to one flat manifests.yaml
+#   4. commit + push that file to the hydrated repo
+#   5. tell Argo CD's Application for this stage to deploy exactly that new commit
+#
+# Right now every stage's `destination.server` (in apps/20-workloads/podinfo.yaml) is the same cluster --
+# only the namespace differs. The day you have a second cluster, the change happens in exactly one place:
+# that Application's destination, not here. Kargo doesn't care how many clusters are involved; it only
+# ever talks to Argo CD Applications, and Argo CD is what actually reaches across clusters.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: dev
+  namespace: podinfo
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: podinfo
+      sources:
+        direct: true
+  promotionTemplate:
+    spec:
+      vars:
+        - name: sourceRepo
+          value: https://github.com/rorobig/homelab-gitops.git
+        - name: hydratedRepo
+          value: https://github.com/rorobig/homelab-gitops-hydrated.git
+        - name: imageRepo
+          value: ghcr.io/stefanprodan/podinfo
+        - name: envDir
+          value: dev
+      steps:
+        - uses: git-clone
+          config:
+            repoURL: ${{ vars.sourceRepo }}
+            checkout:
+              - branch: main
+                path: ./src
+        - uses: git-clone
+          config:
+            repoURL: ${{ vars.hydratedRepo }}
+            checkout:
+              - branch: main
+                create: true
+                path: ./out
+        - uses: git-clear
+          config:
+            path: ./out/${{ vars.envDir }}
+        - uses: kustomize-set-image
+          as: update-image
+          config:
+            path: ./src/workloads/podinfo/overlays/${{ vars.envDir }}
+            images:
+              - image: ${{ vars.imageRepo }}
+                tag: ${{ imageFrom(vars.imageRepo).Tag }}
+        - uses: kustomize-build
+          config:
+            path: ./src/workloads/podinfo/overlays/${{ vars.envDir }}
+            outPath: ./out/${{ vars.envDir }}/manifests.yaml
+        - uses: git-commit
+          as: commit
+          config:
+            path: ./out
+            message: ${{ outputs['update-image'].commitMessage }}
+        - uses: git-push
+          config:
+            path: ./out
+            targetBranch: main
+        - uses: argocd-update
+          config:
+            apps:
+              - name: podinfo-${{ vars.envDir }}
+                sources:
+                  - repoURL: ${{ vars.hydratedRepo }}
+                    desiredRevision: ${{ outputs.commit.commit }}
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: staging
+  namespace: podinfo
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: podinfo
+      sources:
+        stages:
+          - dev
+  promotionTemplate:
+    spec:
+      vars:
+        - name: sourceRepo
+          value: https://github.com/rorobig/homelab-gitops.git
+        - name: hydratedRepo
+          value: https://github.com/rorobig/homelab-gitops-hydrated.git
+        - name: imageRepo
+          value: ghcr.io/stefanprodan/podinfo
+        - name: envDir
+          value: staging
+      steps:
+        - uses: git-clone
+          config:
+            repoURL: ${{ vars.sourceRepo }}
+            checkout:
+              - branch: main
+                path: ./src
+        - uses: git-clone
+          config:
+            repoURL: ${{ vars.hydratedRepo }}
+            checkout:
+              - branch: main
+                create: true
+                path: ./out
+        - uses: git-clear
+          config:
+            path: ./out/${{ vars.envDir }}
+        - uses: kustomize-set-image
+          as: update-image
+          config:
+            path: ./src/workloads/podinfo/overlays/${{ vars.envDir }}
+            images:
+              - image: ${{ vars.imageRepo }}
+                tag: ${{ imageFrom(vars.imageRepo).Tag }}
+        - uses: kustomize-build
+          config:
+            path: ./src/workloads/podinfo/overlays/${{ vars.envDir }}
+            outPath: ./out/${{ vars.envDir }}/manifests.yaml
+        - uses: git-commit
+          as: commit
+          config:
+            path: ./out
+            message: ${{ outputs['update-image'].commitMessage }}
+        - uses: git-push
+          config:
+            path: ./out
+            targetBranch: main
+        - uses: argocd-update
+          config:
+            apps:
+              - name: podinfo-${{ vars.envDir }}
+                sources:
+                  - repoURL: ${{ vars.hydratedRepo }}
+                    desiredRevision: ${{ outputs.commit.commit }}
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: prod
+  namespace: podinfo
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: podinfo
+      sources:
+        stages:
+          - staging
+  promotionTemplate:
+    spec:
+      vars:
+        - name: sourceRepo
+          value: https://github.com/rorobig/homelab-gitops.git
+        - name: hydratedRepo
+          value: https://github.com/rorobig/homelab-gitops-hydrated.git
+        - name: imageRepo
+          value: ghcr.io/stefanprodan/podinfo
+        - name: envDir
+          value: prod
+      steps:
+        - uses: git-clone
+          config:
+            repoURL: ${{ vars.sourceRepo }}
+            checkout:
+              - branch: main
+                path: ./src
+        - uses: git-clone
+          config:
+            repoURL: ${{ vars.hydratedRepo }}
+            checkout:
+              - branch: main
+                create: true
+                path: ./out
+        - uses: git-clear
+          config:
+            path: ./out/${{ vars.envDir }}
+        - uses: kustomize-set-image
+          as: update-image
+          config:
+            path: ./src/workloads/podinfo/overlays/${{ vars.envDir }}
+            images:
+              - image: ${{ vars.imageRepo }}
+                tag: ${{ imageFrom(vars.imageRepo).Tag }}
+        - uses: kustomize-build
+          config:
+            path: ./src/workloads/podinfo/overlays/${{ vars.envDir }}
+            outPath: ./out/${{ vars.envDir }}/manifests.yaml
+        - uses: git-commit
+          as: commit
+          config:
+            path: ./out
+            message: ${{ outputs['update-image'].commitMessage }}
+        - uses: git-push
+          config:
+            path: ./out
+            targetBranch: main
+        - uses: argocd-update
+          config:
+            apps:
+              - name: podinfo-${{ vars.envDir }}
+                sources:
+                  - repoURL: ${{ vars.hydratedRepo }}
+                    desiredRevision: ${{ outputs.commit.commit }}

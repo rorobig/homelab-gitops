@@ -1,0 +1,22 @@
+# A Kargo "Project" groups the pipeline for one app. Creating this Project resource makes Kargo create
+# (and manage) a namespace called "podinfo" -- NOT the same as the podinfo-dev/-staging/-prod namespaces
+# the app itself runs in. This one only holds Kargo's own objects: the Warehouse, the Stages, the git
+# credential Secret. Project is cluster-scoped, so it has no `namespace:` of its own.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: podinfo
+---
+# Per-Stage promotion policy. Only "dev" auto-promotes: the moment the Warehouse below sees a new image,
+# Kargo promotes it into dev with no human involved. staging and prod are left out on purpose -- promoting
+# those means clicking "Promote" in the Kargo UI (or `kargo promote`) once you've looked at what's in dev.
+# That's the whole point of the pipeline: dev is where noise lands automatically, staging/prod are gated.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: ProjectConfig
+metadata:
+  name: podinfo
+  namespace: podinfo
+spec:
+  promotionPolicies:
+    - stage: dev
+      autoPromotionEnabled: true

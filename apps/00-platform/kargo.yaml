@@ -1,0 +1,44 @@
+# Kargo: the promotion pipeline for workloads/podinfo (dev -> staging -> prod).
+# Installed the same way cert-manager is (wave 5, right before this): a Helm chart Argo CD pulls straight
+# from its OCI registry. Needs cert-manager for its self-signed webhook certs, hence the wave order.
+#
+# Auth: Kargo's admin login needs a bcrypt password hash + a JWT signing key. Those live in a Secret
+# ("kargo-bootstrap-secrets", namespace kargo) that is NOT in this repo -- same treatment any other
+# credential would get here. It was created once by hand:
+#   kubectl -n kargo create secret generic kargo-bootstrap-secrets \
+#     --from-literal=ADMIN_ACCOUNT_PASSWORD_HASH='<bcrypt hash>' \
+#     --from-literal=ADMIN_ACCOUNT_TOKEN_SIGNING_KEY='<random string>'
+# `api.secret.name` below just tells the chart "use that Secret, don't generate your own".
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kargo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/akuity/kargo-charts/kargo
+    chart: kargo
+    targetRevision: 1.11.4
+    helm:
+      valuesObject:
+        api:
+          # The gateway is the front door (see platform/networking/routes/kargo); Kargo doesn't need to
+          # terminate its own TLS, same call already made for Argo CD itself.
+          host: kargo.home.arpa
+          tls:
+            enabled: false
+          secret:
+            name: kargo-bootstrap-secrets
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kargo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true # Kargo's CRDs (Stage especially) are big; client-side apply chokes on them.

@@ -1,5 +1,10 @@
-# One Application per environment (podinfo-dev / -staging / -prod), each from its own overlay.
-# This is the promotion target layout for Kargo.
+# One Application per environment (podinfo-dev / -staging / -prod). Each one deploys whatever Kargo most
+# recently promoted into that environment's directory in the *hydrated* repo (homelab-gitops-hydrated) --
+# NOT the kustomize overlays in workloads/podinfo/overlays/ here. Those overlays are Kargo's source
+# material (see platform/delivery/podinfo/stages.yaml); Argo CD never reads them directly any more.
+#
+# Until Kargo has promoted at least once, {{.env}}/ won't exist in the hydrated repo yet and these
+# Applications will show "ComparisonError" -- that's expected on a fresh install, not a bug.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -19,12 +24,17 @@ spec:
   template:
     metadata:
       name: 'podinfo-{{.env}}'
+      annotations:
+        # The authorization handshake: without this, Kargo's argocd-update step refuses to touch this
+        # Application. "podinfo" is the Kargo Project name (platform/delivery/podinfo/project.yaml), and
+        # the part after the colon must match the Stage name that's allowed to update it.
+        kargo.akuity.io/authorized-stage: 'podinfo:{{.env}}'
     spec:
       project: default
       source:
-        repoURL: https://github.com/rorobig/homelab-gitops.git
+        repoURL: https://github.com/rorobig/homelab-gitops-hydrated.git
         targetRevision: main
-        path: 'workloads/podinfo/overlays/{{.env}}'
+        path: '{{.env}}'
       destination:
         server: https://kubernetes.default.svc
         namespace: 'podinfo-{{.env}}'

@@ -1,0 +1,15 @@
+# A Warehouse watches upstream sources and turns what it finds into "Freight": an immutable, versioned
+# bundle of concrete artifact refs (here, just one image tag). Every 5 minutes it checks
+# ghcr.io/stefanprodan/podinfo for new tags matching the constraint below; each new match becomes a new
+# piece of Freight, which the dev Stage (subscribed directly to this Warehouse) then auto-promotes.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: podinfo
+  namespace: podinfo
+spec:
+  interval: 5m
+  subscriptions:
+    - image:
+        repoURL: ghcr.io/stefanprodan/podinfo
+        semverConstraint: ">=6.0.0"

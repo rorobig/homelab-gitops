@@ -2,7 +2,8 @@
 
 A small Kubernetes cluster at home, set up as a **playground for AI gateways**. It runs two tiny AI models (a 1.5B and a 0.5B), puts
 **agentgateway** in front of it, and shows what a gateway can do with AI traffic: watch it, filter it, rewrite it.
-It also has a demo app in three environments, ready for **Kargo** (promoting a version dev → staging → prod).
+It also has a demo app in three environments, promoted between them by **Kargo** (dev → staging → prod), hydrated
+into a second repo the way you'd do it at work.
 
 The cluster itself (VMs, k3s, Argo CD) is built by [homelab-proxmox](https://github.com/rorobig/homelab-proxmox).
 **This repo is everything that runs on it. You never `kubectl apply` things by hand: you edit a file here, push
@@ -22,6 +23,12 @@ to `main`, and the cluster changes to match.**
 | **MCP** | "Model Context Protocol": a standard way for AI apps to discover and call *tools* ("roll a die", "look up a ticket"). Agents and AI assistants speak it. |
 | **Agent** | An AI model that keeps deciding "which tool do I call next?" until it can answer. A loop of think, act, think. |
 | **kagent** | An open-source (Apache 2.0) framework for running agents on Kubernetes. You describe an agent in YAML; it runs it. |
+| **Kargo** | Promotes a version of an app through environments (dev → staging → prod), one deliberate step at a time. See "Kargo: promoting podinfo" below. |
+| **Warehouse** | Kargo's watcher: polls an image repo (or Helm chart, or git repo) for new versions and turns each one it finds into Freight. |
+| **Freight** | One immutable, versioned bundle of artifact refs (here, just an image tag) that Kargo moves through the pipeline. |
+| **Stage** | One environment in the pipeline (dev / staging / prod). Says which Freight it's allowed to take and what to do when it gets some (a "Promotion"). |
+| **Promotion** | The act of moving one piece of Freight into one Stage: render the manifests, push them, tell Argo CD to deploy them. |
+| **hydrated manifests** | Fully-rendered, ready-to-apply YAML (no more Kustomize, no more templating) -- the *output* of a Promotion. Lives in a separate repo, [homelab-gitops-hydrated](https://github.com/rorobig/homelab-gitops-hydrated), so Argo CD only ever looks at plain files, never re-runs a build. |
 | **LLM / model** | The AI. Here two small ones run by **Ollama**: `qwen2.5:1.5b` (the "smart" one) and `qwen2.5:0.5b` (the tiny one; it answers `llm.home.arpa` and is the failover fallback). |
 | **Token** | The unit AI is measured in (roughly ¾ of a word). Gateways count them to track usage and cost. |
 | **DNS** | The phone book that turns `llm.home.arpa` into an IP address. We run our own inside the cluster. |
@@ -194,6 +201,7 @@ only ever sends read queries. Don't loosen any of this casually.
 | http://mcp.home.arpa/mcp | the MCP tool server (use `scripts/mcp-demo.sh`) | none |
 | http://kagent.home.arpa | kagent: chat with the AI agents | none |
 | http://podinfo-dev.home.arpa (`-staging`, `-prod`) | demo web app, three copies | none |
+| http://kargo.home.arpa | Kargo: see Freight move through dev → staging → prod, click "Promote" | `admin` + the password from `kargo-bootstrap-secrets` (see "Kargo: promoting podinfo") |
 
 ## What is deployed
 
@@ -208,10 +216,12 @@ define new resource types must exist before things that use them.
 | 2 | `agentgateway` | The controller: runs a proxy for each Gateway |
 | 3 | `gateway` | The one Gateway: port 80 |
 | 3 | `agentgateway-monitoring` | Lets Prometheus scrape the proxy + the Grafana dashboard |
-| 4 | `routes` | HTTPRoutes for Argo CD and Grafana |
-| 5 | `cert-manager` | Certificates. **Unused for now**, Kargo needs it |
+| 4 | `routes` | HTTPRoutes for Argo CD, Grafana and Kargo |
+| 5 | `cert-manager` | Certificates. Kargo's webhook needs it |
 | 6 | `k8s-gateway` | The DNS server for `*.home.arpa` |
-| 20 | `podinfo-*` | A tiny web app x 3 environments (one ApplicationSet), the Kargo playground |
+| 7 | `kargo` | Kargo itself: API server, controller, webhooks (Helm chart) |
+| 8 | `kargo-delivery` | The podinfo pipeline: Project, Warehouse, Stages (`platform/delivery/`) |
+| 20 | `podinfo-*` | A tiny web app x 3 environments (one ApplicationSet), deployed from the *hydrated* repo, promoted by Kargo |
 | 20 | `llm` | Two Ollamas (small + big) and the AI routes: guard, pirate, failover (`workloads/llm/`) |
 | 20 | `mcp` | The demo MCP tool server and its gateway route (`workloads/mcp/`) |
 | 21 | `kagent-crds` | Teaches Kubernetes what an `Agent` / `ModelConfig` is |
@@ -234,10 +244,12 @@ bootstrap/all-apps-of-apps.yaml   the root: creates one Application per file in 
 apps/                             one Argo CD Application per file (00-platform, 10-observability, 20-workloads, 30-agents)
 platform/networking/              the Gateway and the plain routes
 platform/observability/           Prometheus scrape config + Grafana dashboard for agentgateway
+platform/delivery/podinfo/        Kargo's Project, Warehouse and Stages for podinfo
 workloads/llm/                    the AI demos: ollama (+big), backend, route, guard, pirate, failover
 workloads/mcp/                    the MCP demo: tool server + gateway route
 workloads/kagent/                 the AI agents: model, tools, agents, gateway wiring, UI route
-workloads/podinfo/                the demo app: base + dev/staging/prod overlays
+workloads/podinfo/                the demo app's *source*: base + dev/staging/prod overlays (Kargo's raw material --
+                                   Argo CD never deploys straight from here any more, see "Kargo: promoting podinfo")
 scripts/llm-demo.sh               helper to poke the AI (chat, blocked, load, failover-demo)
 scripts/mcp-demo.sh               helper to list and call MCP tools through the gateway
 ```
@@ -268,12 +280,82 @@ scripts/mcp-demo.sh               helper to list and call MCP tools through the 
 - **Node IPs come from DHCP** (the router) and can change; DNS and kubeconfig point at them. A fixed address for
   everything would need MetalLB or static IPs in Terraform.
 
-## Kargo prep
+## Kargo: promoting podinfo
 
-`podinfo` runs as `podinfo-dev`, `-staging` and `-prod` (Kustomize base + overlays in `workloads/podinfo/`). All three
-start on image `6.14.0`; newer versions exist, so Kargo will have something to discover and promote. The version lives in
-each overlay's `kustomization.yaml`, which is the file a promotion edits. Still to do: install Kargo, give it a GitHub
-token that can push here, and annotate the podinfo Applications (`kargo.akuity.io/authorized-stage`).
+Two repos, on purpose -- this is the shape you'd want at work, where "the pipeline config" and "what's actually
+running" have very different audiences and very different git history:
+
+```
+ this repo (homelab-gitops)                    homelab-gitops-hydrated (a second, separate repo)
+ ─────────────────────────────                 ──────────────────────────────────────────────────
+ workloads/podinfo/base, overlays/{dev,staging,prod}    dev/manifests.yaml
+   ↑ kustomize SOURCE. No image tag committed here.       staging/manifests.yaml
+   ↑ you edit this by hand (add a route, bump              prod/manifests.yaml
+     resource limits, ...)                                 ↑ fully rendered, flat YAML.
+                                                             ↑ ONLY Kargo commits here. Never by hand.
+ platform/delivery/podinfo/  (Project, Warehouse, Stages)
+   ↑ the pipeline definition itself -- also just files
+     in this repo, synced by Argo CD like anything else
+
+                    Warehouse polls ghcr.io/stefanprodan/podinfo for new tags
+                                        │
+                                        ▼
+                    dev  ──(auto)──▶  staging  ──(you click Promote)──▶  prod
+                    each arrow = a Promotion: clone both repos, stamp the new tag into
+                    the overlay, `kustomize build` it, commit+push to the hydrated repo,
+                    tell the matching Argo CD Application (podinfo-{dev,staging,prod})
+                    to deploy that exact new commit
+```
+
+Why split them: the source repo's history is "a human changed the app or the pipeline" -- worth reading, worth PRs.
+The hydrated repo's history is "Kargo promoted image X into env Y at time Z" -- a hundred commits a week, all of them
+machine-generated, useless to read but exactly what you want if you ever need to answer "what was running in prod
+last Tuesday". Keeping them apart means `git log` on either one stays meaningful, and Argo CD's diffs in the
+hydrated repo are always the *real* diff (no Kustomize/Helm rendering hiding what actually changed).
+
+### One-time setup (not done for you, and none of it belongs in git)
+
+1. **Create the second repo**: an empty GitHub repo named `homelab-gitops-hydrated` under the same account, with
+   "Add a README" ticked so `main` exists from the start.
+2. **A token Kargo can push with**: a GitHub fine-grained PAT scoped to just that repo, Contents: Read and write.
+   Then, per Kargo Project (there's one, `podinfo`), a git credential Secret -- this is the equivalent of the
+   `kargo-bootstrap-secrets` Secret in `apps/00-platform/kargo.yaml`, same reasoning, never committed:
+   ```bash
+   kubectl -n podinfo create secret generic podinfo-hydrated-repo-creds \
+     --from-literal=repoURL=https://github.com/rorobig/homelab-gitops-hydrated.git \
+     --from-literal=username=<your-github-username> \
+     --from-literal=password=<the-fine-grained-PAT>
+   kubectl -n podinfo label secret podinfo-hydrated-repo-creds kargo.akuity.io/cred-type=git
+   ```
+3. **Log in**: `http://kargo.home.arpa`, admin + the password printed when `kargo-bootstrap-secrets` was created
+   (ask the chat that set this up if you didn't save it, or just regenerate the Secret -- see the comment in
+   `apps/00-platform/kargo.yaml`).
+
+Until step 2 is done, dev's Promotion will sit there failing at the `git-push` step -- that's the credential Secret
+missing, not a bug. And until the *first* Promotion of each Stage succeeds, `podinfo-dev` / `-staging` / `-prod`
+in Argo CD will show `ComparisonError` (their directory doesn't exist yet in the hydrated repo). Both resolve
+themselves once step 2 is in place and Kargo runs once.
+
+### Day to day
+
+- **dev** auto-promotes (`platform/delivery/podinfo/project.yaml`): every new podinfo tag lands there with no
+  clicks, usually within the Warehouse's 5-minute poll interval.
+- **staging** and **prod** don't. In the Kargo UI, open the `podinfo` Project, click the Freight sitting in dev,
+  click **Promote** into staging (then, separately, into prod once you're happy). Or from the CLI:
+  `kargo promote --project podinfo --stage staging --freight <id>` (`kargo login https://kargo.home.arpa` first).
+  That's the actual point of the exercise: dev is where noise lands automatically, staging/prod are where a person
+  decides.
+
+### The multi-cluster part (why this is worth doing even with one cluster)
+
+Every Stage's `promotionTemplate` only ever talks to an Argo CD *Application* -- it never touches a cluster
+directly. Right now all three podinfo Applications (`apps/20-workloads/podinfo.yaml`) have the same
+`destination.server: https://kubernetes.default.svc`, just different namespaces. At work, the day staging or prod
+needs to live on a different cluster, the change is: register that cluster with Argo CD (`argocd cluster add`, or a
+cluster Secret) and point that one Application's `destination.server` at it. Nothing in `platform/delivery/` needs
+to change -- Kargo still just says "update this Application", and it's Argo CD, not Kargo, that reaches across
+clusters. That's the whole reason for keeping "which cluster" a property of the Application and not of the
+Promotion.
 
 ## Rebuild from scratch
 

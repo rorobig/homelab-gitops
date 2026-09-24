@@ -1,0 +1,24 @@
+# Deploys the Kargo pipeline objects (Project, Warehouse, Stages) from platform/delivery/. One subfolder
+# per app -- today just podinfo. Must sync after Kargo itself (wave 7) so its CRDs already exist.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kargo-delivery
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rorobig/homelab-gitops.git
+    targetRevision: main
+    path: platform/delivery
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kargo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

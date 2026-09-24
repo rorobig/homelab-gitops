@@ -1,11 +1,12 @@
+# No `images:` override here on purpose: Kargo's kustomize-set-image promotion step injects the image
+# tag at promotion time (see platform/delivery/podinfo/stages.yaml). Running `kustomize build` on this
+# overlay by hand gives you the base image with no tag (effectively `:latest`) -- that's only meant to
+# happen inside a Kargo promotion, never as the thing Argo CD actually deploys.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: podinfo-dev
 resources:
   - ../../base
-images:
-  - name: ghcr.io/stefanprodan/podinfo
-    newTag: 6.14.0
 patches:
   - target:
       kind: HTTPRoute
