@@ -8,7 +8,7 @@
 #
 # Every promotionTemplate below does the same five things, only the paths/branch differ:
 #   1. git-clone this repo (the kustomize source) and the hydrated repo (the Argo CD-facing output)
-#   2. wipe this stage's old rendered output
+#   2. delete this stage's old rendered output (only its own folder; the other envs share the repo)
 #   3. stamp the new image tag into the overlay, then `kustomize build` it to one flat manifests.yaml
 #   4. commit + push that file to the hydrated repo
 #   5. tell Argo CD's Application for this stage to deploy exactly that new commit
@@ -54,7 +54,7 @@ spec:
               - branch: main
                 create: true
                 path: ./out
-        - uses: git-clear
+        - uses: delete # not git-clear: that wipes the whole working tree (every env), and needs its root
           config:
             path: ./out/${{ vars.envDir }}
         - uses: kustomize-set-image
@@ -123,7 +123,7 @@ spec:
               - branch: main
                 create: true
                 path: ./out
-        - uses: git-clear
+        - uses: delete # not git-clear: that wipes the whole working tree (every env), and needs its root
           config:
             path: ./out/${{ vars.envDir }}
         - uses: kustomize-set-image
@@ -192,7 +192,7 @@ spec:
               - branch: main
                 create: true
                 path: ./out
-        - uses: git-clear
+        - uses: delete # not git-clear: that wipes the whole working tree (every env), and needs its root
           config:
             path: ./out/${{ vars.envDir }}
         - uses: kustomize-set-image
