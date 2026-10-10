@@ -10,7 +10,9 @@
 #   1. git-clone this repo (the kustomize source) and the hydrated repo (the Argo CD-facing output)
 #   2. delete this stage's old rendered output (only its own folder; the other envs share the repo)
 #   3. stamp the new image tag into the overlay, then `kustomize build` it to one flat manifests.yaml
-#   4. commit + push that file to the hydrated repo
+#   4. commit + push that file to this stage's own branch (stage/<env>) of the hydrated repo. Own branch, not a
+#      shared main: otherwise every other stage's push moves the commit this stage's Application is on, and
+#      Kargo flags the stage unhealthy because it's no longer on the revision Kargo pushed for it.
 #   5. tell Argo CD's Application for this stage to deploy exactly that new commit
 #
 # Right now every stage's `destination.server` (in apps/20-workloads/podinfo.yaml) is the same cluster --
@@ -51,7 +53,7 @@ spec:
           config:
             repoURL: ${{ vars.hydratedRepo }}
             checkout:
-              - branch: main
+              - branch: stage/${{ vars.envDir }}
                 create: true
                 path: ./out
         - uses: delete # not git-clear: that wipes the whole working tree (every env), and needs its root
@@ -76,7 +78,7 @@ spec:
         - uses: git-push
           config:
             path: ./out
-            targetBranch: main
+            targetBranch: stage/${{ vars.envDir }}
         - uses: argocd-update
           config:
             apps:
@@ -120,7 +122,7 @@ spec:
           config:
             repoURL: ${{ vars.hydratedRepo }}
             checkout:
-              - branch: main
+              - branch: stage/${{ vars.envDir }}
                 create: true
                 path: ./out
         - uses: delete # not git-clear: that wipes the whole working tree (every env), and needs its root
@@ -145,7 +147,7 @@ spec:
         - uses: git-push
           config:
             path: ./out
-            targetBranch: main
+            targetBranch: stage/${{ vars.envDir }}
         - uses: argocd-update
           config:
             apps:
@@ -189,7 +191,7 @@ spec:
           config:
             repoURL: ${{ vars.hydratedRepo }}
             checkout:
-              - branch: main
+              - branch: stage/${{ vars.envDir }}
                 create: true
                 path: ./out
         - uses: delete # not git-clear: that wipes the whole working tree (every env), and needs its root
@@ -214,7 +216,7 @@ spec:
         - uses: git-push
           config:
             path: ./out
-            targetBranch: main
+            targetBranch: stage/${{ vars.envDir }}
         - uses: argocd-update
           config:
             apps:

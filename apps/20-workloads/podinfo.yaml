@@ -33,7 +33,7 @@ spec:
       project: default
       source:
         repoURL: https://github.com/rorobig/homelab-gitops-hydrated.git
-        targetRevision: main
+        targetRevision: 'stage/{{.env}}' # one branch per env; see platform/delivery/podinfo/stages.yaml
         path: '{{.env}}'
       destination:
         server: https://kubernetes.default.svc
