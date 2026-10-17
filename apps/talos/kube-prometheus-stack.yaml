@@ -22,6 +22,11 @@ spec:
             podMonitorSelectorNilUsesHelmValues: false
         grafana:
           enabled: true
+        prometheusOperator:
+          admissionWebhooks:
+            enabled: false
+          tls:
+            enabled: false
   destination:
     name: talos
     namespace: monitoring
