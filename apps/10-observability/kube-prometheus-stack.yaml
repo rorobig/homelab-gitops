@@ -30,6 +30,9 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged # node-exporter needs hostNetwork/hostPID/hostPath
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true

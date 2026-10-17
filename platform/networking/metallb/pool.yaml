@@ -1,0 +1,20 @@
+# The one LAN IP MetalLB hands out: 192.168.1.70 (outside the router's DHCP pool and the CAPI node range .61-.69).
+# The gateway (:80) and DNS (:53) Services share it via the metallb.io/allow-shared-ip annotation, so
+# *.home.arpa and the DNS server both live on .70.
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: lan
+  namespace: metallb-system
+spec:
+  addresses:
+    - 192.168.1.70/32
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: lan
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - lan

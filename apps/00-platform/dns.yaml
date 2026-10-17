@@ -1,5 +1,5 @@
-# Serves *.home.arpa for the LAN: answers every HTTPRoute hostname with the node IPs, forwards everything else upstream.
-# Exposed on :53 of every node by k3s ServiceLB. Point your PC's DNS at any node IP.
+# Serves *.home.arpa for the LAN: answers every HTTPRoute hostname with the gateway IP, forwards everything else
+# upstream. MetalLB puts it on 192.168.1.70:53, sharing the IP with the gateway. Point your PC's DNS at .70.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -19,6 +19,9 @@ spec:
         watchedResources: ["HTTPRoute"]
         service:
           useTcp: true
+          annotations:
+            metallb.io/loadBalancerIPs: 192.168.1.70
+            metallb.io/allow-shared-ip: lan
   destination:
     server: https://kubernetes.default.svc
     namespace: dns
