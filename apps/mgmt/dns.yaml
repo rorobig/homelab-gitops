@@ -1,4 +1,4 @@
-# DNS for the LAN on 192.168.1.71: *.home.arpa answers, everything else goes to the router.
+# DNS for the LAN on 192.168.1.71: argocd.home.arpa -> .71, other *.home.arpa -> .70, the rest -> router.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -23,12 +23,15 @@ spec:
         servers:
           - zones:
               - zone: home.arpa.
+                use_tcp: true
             port: 53
             plugins:
               - name: errors
-              - name: hosts
+              - name: template
+                parameters: IN A home.arpa
                 configBlock: |-
-                  192.168.1.71 argocd.home.arpa
+                  match ^argocd\.home\.arpa\.$
+                  answer "{{ .Name }} 60 IN A 192.168.1.71"
                   fallthrough
               - name: template
                 parameters: IN A home.arpa
@@ -36,6 +39,7 @@ spec:
                   answer "{{ .Name }} 60 IN A 192.168.1.70"
           - zones:
               - zone: .
+                use_tcp: true
             port: 53
             plugins:
               - name: errors
