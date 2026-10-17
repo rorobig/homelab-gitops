@@ -1,4 +1,4 @@
-# Deploys MetalLB's IP pool (platform/networking/metallb/). Must sync after the metallb chart (wave 1) so its CRDs exist.
+# MetalLB's IP pool (platform/networking/metallb/).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

@@ -17,7 +17,7 @@ metadata:
 spec:
   gatewayClassName: agentgateway   # which gateway software runs this door (created by the controller)
   infrastructure:
-    annotations:                   # copied onto the generated Service: pin .70, shared with DNS (k8s-gateway)
+    annotations:
       metallb.io/loadBalancerIPs: 192.168.1.70
       metallb.io/allow-shared-ip: lan
   listeners:

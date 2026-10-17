@@ -1,6 +1,4 @@
-# MetalLB: gives LoadBalancer Services a real LAN IP (Talos has no built-in load balancer, unlike k3s's ServiceLB).
-# In L2 mode one node answers ARP for the IP and another takes over if it dies. The IP pool is in
-# platform/networking/metallb/ (wave 2, after the CRDs from this chart exist).
+# MetalLB: gives LoadBalancer Services a LAN IP. The pool is in platform/networking/metallb/.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -23,7 +21,7 @@ spec:
       selfHeal: true
     managedNamespaceMetadata:
       labels:
-        pod-security.kubernetes.io/enforce: privileged # the speaker needs hostNetwork + NET_RAW
+        pod-security.kubernetes.io/enforce: privileged
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true

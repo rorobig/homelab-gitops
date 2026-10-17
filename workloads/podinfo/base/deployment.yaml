@@ -28,7 +28,7 @@ spec:
               port: http
           resources:
             requests:
-              cpu: 10m
+              cpu: 15m
               memory: 32Mi
             limits:
               memory: 128Mi
