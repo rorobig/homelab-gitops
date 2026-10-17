@@ -1,7 +1,7 @@
 # homelab-gitops
 
 Everything that runs on the homelab cluster: a Talos cluster on Proxmox, managed by Cluster API. The cluster itself
-(VMs, Talos, Argo CD) is built from [homelab-proxmox/capi](https://github.com/rorobig/homelab-proxmox/tree/main/capi).
+(VMs, Talos, Argo CD) is built from [homelab-proxmox](https://github.com/rorobig/homelab-proxmox).
 
 **How it works:** Argo CD watches this repo and makes the cluster match it. You don't `kubectl apply` things by
 hand. Edit a file, push to `main`, and the cluster follows.
@@ -131,5 +131,5 @@ nslookup argocd.home.arpa   # check
 
 ## Rebuild from scratch
 
-Follow [homelab-proxmox/capi](https://github.com/rorobig/homelab-proxmox/tree/main/capi): Cluster API builds the
+Follow [homelab-proxmox](https://github.com/rorobig/homelab-proxmox): Cluster API builds the
 Talos cluster, `bootstrap-argocd.sh` installs Argo CD and the root app, and Argo CD installs everything in this repo.
