@@ -1,0 +1,28 @@
+# Adds every Cluster API cluster to Argo CD, so apps can target it by name.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mgmt-cluster-registration
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rorobig/homelab-gitops.git
+    targetRevision: main
+    path: platform/cluster-registration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,27 @@
+# HTTPRoutes for this cluster's UIs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: talos-routes
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rorobig/homelab-gitops.git
+    targetRevision: main
+    path: platform/networking/routes/talos
+    directory:
+      recurse: true
+  destination:
+    name: talos
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 10s
+        maxDuration: 3m

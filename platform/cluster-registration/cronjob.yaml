@@ -1,0 +1,91 @@
+# Every minute: turns each Cluster API kubeconfig Secret into an Argo CD cluster Secret named after the cluster.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cluster-registration
+  namespace: argocd
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: cluster-registration
+          restartPolicy: Never
+          containers:
+            - name: register
+              image: alpine/k8s:1.34.12
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  kubectl get clusters.cluster.x-k8s.io -A --no-headers -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name |
+                  while read -r ns name; do
+                    kubectl -n "$ns" get secret "$name-kubeconfig" -o jsonpath='{.data.value}' 2>/dev/null | base64 -d > /tmp/kc || continue
+                    [ -s /tmp/kc ] || continue
+                    server=$(yq '.clusters[0].cluster.server' /tmp/kc)
+                    config=$(yq -o=json -I=0 '{"tlsClientConfig": {"caData": .clusters[0].cluster."certificate-authority-data", "certData": .users[0].user."client-certificate-data", "keyData": .users[0].user."client-key-data"}}' /tmp/kc)
+                    kubectl -n argocd create secret generic "cluster-$name" \
+                      --from-literal=name="$name" --from-literal=server="$server" --from-literal=config="$config" \
+                      --dry-run=client -o yaml |
+                      kubectl label --local -f - argocd.argoproj.io/secret-type=cluster -o yaml |
+                      kubectl apply -f -
+                  done
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-registration
+  namespace: argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-registration
+rules:
+  - apiGroups: ["cluster.x-k8s.io"]
+    resources: ["clusters"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-registration
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-registration
+subjects:
+  - kind: ServiceAccount
+    name: cluster-registration
+    namespace: argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cluster-registration
+  namespace: argocd
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cluster-registration
+  namespace: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cluster-registration
+subjects:
+  - kind: ServiceAccount
+    name: cluster-registration
+    namespace: argocd

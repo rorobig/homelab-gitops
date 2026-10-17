@@ -1,0 +1,28 @@
+# The agentgateway controller; it runs the proxy behind the Gateway.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mgmt-agentgateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: cr.agentgateway.dev/charts
+    chart: agentgateway
+    targetRevision: v1.5.0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: agentgateway-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true

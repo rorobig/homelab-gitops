@@ -1,0 +1,29 @@
+# Gateway API resource types (Gateway, HTTPRoute, ...).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mgmt-gateway-api-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kubernetes-sigs/gateway-api.git
+    targetRevision: v1.6.0
+    path: config/crd/standard
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+    syncOptions:
+      - ServerSideApply=true

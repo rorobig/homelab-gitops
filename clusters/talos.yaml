@@ -1,0 +1,189 @@
+# The cluster itself: ties the Proxmox infrastructure and the Talos control plane together.
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: talos
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks: ["10.244.0.0/16"]
+    services:
+      cidrBlocks: ["10.96.0.0/12"]
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: ProxmoxCluster
+    name: talos
+  controlPlaneRef:
+    apiGroup: controlplane.cluster.x-k8s.io
+    kind: TalosControlPlane
+    name: talos-control-plane
+---
+# Proxmox-side settings shared by all nodes: API VIP, node IP pool, gateway and DNS.
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+kind: ProxmoxCluster
+metadata:
+  name: talos
+spec:
+  controlPlaneEndpoint:
+    host: 192.168.1.60
+    port: 6443
+  ipv4Config:
+    addresses: ["192.168.1.61-192.168.1.69"]
+    prefix: 24
+    gateway: 192.168.1.1
+  dnsServers: ["192.168.1.1", "1.1.1.1"]
+  allowedNodes: ["pve"]
+---
+# The control-plane nodes: how many, which Kubernetes version, and their Talos config.
+apiVersion: controlplane.cluster.x-k8s.io/v1alpha3
+kind: TalosControlPlane
+metadata:
+  name: talos-control-plane
+spec:
+  version: v1.37.1
+  replicas: 1
+  infrastructureTemplate:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+    kind: ProxmoxMachineTemplate
+    name: talos-control-plane
+  controlPlaneConfig:
+    controlplane:
+      generateType: controlplane
+      talosVersion: v1.14
+      strategicPatches:
+        - |
+          machine:
+            network:
+              interfaces:
+                - deviceSelector:
+                    physical: true
+                  vip:
+                    ip: 192.168.1.60
+            features:
+              kubernetesTalosAPIAccess:
+                enabled: true
+                allowedRoles: ["os:reader"]
+                allowedKubernetesNamespaces: ["kube-system"]
+          cluster:
+            externalCloudProvider:
+              enabled: true
+              manifests:
+                - https://raw.githubusercontent.com/siderolabs/talos-cloud-controller-manager/v1.14.0/docs/deploy/cloud-controller-manager.yml
+        - |
+          apiVersion: v1alpha1
+          kind: KubeControllerManagerConfig
+          extraArgs:
+            bind-address: 0.0.0.0
+        - |
+          apiVersion: v1alpha1
+          kind: KubeSchedulerConfig
+          extraArgs:
+            bind-address: 0.0.0.0
+        - |
+          apiVersion: v1alpha1
+          kind: KubeProxyConfig
+          config:
+            metricsBindAddress: 0.0.0.0:10249
+---
+# VM shape for control-plane nodes: template to clone, CPU, memory, disk, network.
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+kind: ProxmoxMachineTemplate
+metadata:
+  name: talos-control-plane
+spec:
+  template:
+    spec:
+      sourceNode: pve
+      templateID: 9000
+      full: true
+      storage: local-lvm
+      numSockets: 1
+      numCores: 2
+      memoryMiB: 3072
+      disks:
+        bootVolume:
+          disk: scsi0
+          sizeGb: 20
+      network:
+        networkDevices:
+          - name: net0
+            bridge: vmbr0
+            model: virtio
+      metadataSettings:
+        providerIDInjection: true
+      checks:
+        skipCloudInitStatus: true
+---
+# The worker nodes: how many, and which VM template and Talos config they use.
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: MachineDeployment
+metadata:
+  name: talos-workers
+spec:
+  clusterName: talos
+  replicas: 2
+  selector:
+    matchLabels: {}
+  template:
+    spec:
+      clusterName: talos
+      version: v1.37.1
+      bootstrap:
+        configRef:
+          apiGroup: bootstrap.cluster.x-k8s.io
+          kind: TalosConfigTemplate
+          name: talos-workers-v2
+      infrastructureRef:
+        apiGroup: infrastructure.cluster.x-k8s.io
+        kind: ProxmoxMachineTemplate
+        name: talos-workers
+---
+# VM shape for worker nodes.
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+kind: ProxmoxMachineTemplate
+metadata:
+  name: talos-workers
+spec:
+  template:
+    spec:
+      sourceNode: pve
+      templateID: 9000
+      full: true
+      storage: local-lvm
+      numSockets: 1
+      numCores: 2
+      memoryMiB: 4096
+      disks:
+        bootVolume:
+          disk: scsi0
+          sizeGb: 30
+      network:
+        networkDevices:
+          - name: net0
+            bridge: vmbr0
+            model: virtio
+      metadataSettings:
+        providerIDInjection: true
+      checks:
+        skipCloudInitStatus: true
+---
+# Talos config for worker nodes.
+apiVersion: bootstrap.cluster.x-k8s.io/v1alpha3
+kind: TalosConfigTemplate
+metadata:
+  name: talos-workers-v2
+spec:
+  template:
+    spec:
+      generateType: worker
+      talosVersion: v1.14
+      strategicPatches:
+        - |
+          cluster:
+            externalCloudProvider:
+              enabled: true
+        - |
+          apiVersion: v1alpha1
+          kind: UserVolumeConfig
+          name: local-path-provisioner
+          volumeType: directory

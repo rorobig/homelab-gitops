@@ -1,0 +1,42 @@
+# Prometheus + Grafana.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: talos-kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 61.3.0
+    helm:
+      releaseName: kube-prometheus-stack
+      values: |
+        prometheus:
+          prometheusSpec:
+            retention: 7d
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+        grafana:
+          enabled: true
+  destination:
+    name: talos
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

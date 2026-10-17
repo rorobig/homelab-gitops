@@ -1,0 +1,32 @@
+# MetalLB: gives LoadBalancer Services a LAN IP.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: talos-metallb
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://metallb.github.io/metallb
+    chart: metallb
+    targetRevision: 0.16.1
+  destination:
+    name: talos
+    namespace: metallb-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

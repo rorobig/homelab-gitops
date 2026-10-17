@@ -1,0 +1,19 @@
+# Port 80 on 192.168.1.70: every *.home.arpa URL of the talos cluster.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: agentgateway-proxy
+  namespace: agentgateway-system
+spec:
+  gatewayClassName: agentgateway
+  infrastructure:
+    annotations:
+      metallb.io/loadBalancerIPs: 192.168.1.70
+      metallb.io/allow-shared-ip: lan
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All

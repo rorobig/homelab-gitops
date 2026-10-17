@@ -1,0 +1,61 @@
+# DNS for the LAN on 192.168.1.71: *.home.arpa answers, everything else goes to the router.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mgmt-dns
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: default
+  source:
+    repoURL: https://coredns.github.io/helm
+    chart: coredns
+    targetRevision: 1.48.2
+    helm:
+      valuesObject:
+        isClusterService: false
+        serviceType: LoadBalancer
+        service:
+          annotations:
+            metallb.io/loadBalancerIPs: 192.168.1.71
+            metallb.io/allow-shared-ip: lan
+        servers:
+          - zones:
+              - zone: home.arpa.
+            port: 53
+            plugins:
+              - name: errors
+              - name: hosts
+                configBlock: |-
+                  192.168.1.71 argocd.home.arpa
+                  fallthrough
+              - name: template
+                parameters: IN A home.arpa
+                configBlock: |-
+                  answer "{{ .Name }} 60 IN A 192.168.1.70"
+          - zones:
+              - zone: .
+            port: 53
+            plugins:
+              - name: errors
+              - name: health
+              - name: ready
+              - name: forward
+                parameters: . 192.168.1.1
+              - name: cache
+                parameters: 30
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dns
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true

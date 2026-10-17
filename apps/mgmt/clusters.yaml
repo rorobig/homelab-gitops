@@ -1,0 +1,30 @@
+# The workload clusters (Cluster API). Deleting a file here deletes that cluster's VMs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mgmt-clusters
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rorobig/homelab-gitops.git
+    targetRevision: main
+    path: clusters
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,29 @@
+# agentgateway's resource types.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: talos-agentgateway-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: cr.agentgateway.dev/charts
+    chart: agentgateway-crds
+    targetRevision: v1.5.0
+  destination:
+    name: talos
+    namespace: agentgateway-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

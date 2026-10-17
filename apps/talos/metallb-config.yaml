@@ -1,0 +1,28 @@
+# MetalLB's IP pool for this cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: talos-metallb-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rorobig/homelab-gitops.git
+    targetRevision: main
+    path: platform/networking/metallb/talos
+  destination:
+    name: talos
+    namespace: metallb-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
