@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: talos-gateway
+  name: gateway
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
@@ -11,9 +11,9 @@ spec:
   source:
     repoURL: https://github.com/rorobig/homelab-gitops.git
     targetRevision: main
-    path: platform/networking/gateway/talos
+    path: platform/networking/gateway
   destination:
-    name: talos
+    server: https://kubernetes.default.svc
     namespace: agentgateway-system
   syncPolicy:
     automated:

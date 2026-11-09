@@ -1,4 +1,4 @@
-# Port 80 on 192.168.1.71: the Argo CD UI.
+# Port 80 on 192.168.1.70: every *.home.arpa URL.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -8,8 +8,7 @@ spec:
   gatewayClassName: agentgateway
   infrastructure:
     annotations:
-      metallb.io/loadBalancerIPs: 192.168.1.71
-      metallb.io/allow-shared-ip: lan
+      metallb.io/loadBalancerIPs: 192.168.1.70
   listeners:
     - name: http
       protocol: HTTP

@@ -1,17 +1,17 @@
-# The Gateway: HTTP on port 80 of this cluster's LoadBalancer IP.
+# The agentgateway controller; it runs the proxy behind the Gateway.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: mgmt-gateway
+  name: agentgateway
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   source:
-    repoURL: https://github.com/rorobig/homelab-gitops.git
-    targetRevision: main
-    path: platform/networking/gateway/mgmt
+    repoURL: cr.agentgateway.dev/charts
+    chart: agentgateway
+    targetRevision: v1.5.0
   destination:
     server: https://kubernetes.default.svc
     namespace: agentgateway-system

@@ -1,4 +1,4 @@
-# The gateway (:80) and DNS (:53) share this one IP.
+# LAN IPs MetalLB may hand out: .70 = the gateway (all *.home.arpa URLs), .71 = DNS.
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
@@ -6,7 +6,7 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-    - 192.168.1.71/32
+    - 192.168.1.70-192.168.1.71
 ---
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement

@@ -1,20 +1,21 @@
-# agentgateway's resource types.
+# Gateway API resource types (Gateway, HTTPRoute, ...).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: talos-agentgateway-crds
+  name: gateway-api-crds
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
   source:
-    repoURL: cr.agentgateway.dev/charts
-    chart: agentgateway-crds
-    targetRevision: v1.5.0
+    repoURL: https://github.com/kubernetes-sigs/gateway-api.git
+    targetRevision: v1.6.0
+    path: config/crd/standard
+    directory:
+      recurse: true
   destination:
-    name: talos
-    namespace: agentgateway-system
+    server: https://kubernetes.default.svc
   syncPolicy:
     automated:
       prune: true
@@ -25,5 +26,4 @@ spec:
         duration: 10s
         maxDuration: 3m
     syncOptions:
-      - CreateNamespace=true
       - ServerSideApply=true

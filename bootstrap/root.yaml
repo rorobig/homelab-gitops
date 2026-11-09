@@ -1,4 +1,4 @@
-# The only thing applied by hand (mgmt/up.sh in homelab-proxmox): one Argo CD Application per file in apps/.
+# The only thing applied by hand (terraform/bootstrap-argocd.sh in homelab-proxmox): one Argo CD Application per file in apps/.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

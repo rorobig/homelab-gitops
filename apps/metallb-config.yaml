@@ -1,21 +1,20 @@
-# HTTPRoutes for this cluster's UIs.
+# MetalLB's IP pool for this cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: talos-routes
+  name: metallb-config
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   source:
     repoURL: https://github.com/rorobig/homelab-gitops.git
     targetRevision: main
-    path: platform/networking/routes/talos
-    directory:
-      recurse: true
+    path: platform/networking/metallb
   destination:
-    name: talos
+    server: https://kubernetes.default.svc
+    namespace: metallb-system
   syncPolicy:
     automated:
       prune: true
@@ -25,3 +24,5 @@ spec:
       backoff:
         duration: 10s
         maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true

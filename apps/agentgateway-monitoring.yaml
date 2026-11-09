@@ -1,21 +1,20 @@
-# The workload clusters (Cluster API). Deleting a file here deletes that cluster's VMs.
+# Prometheus scraping + Grafana dashboard for agentgateway.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: mgmt-clusters
+  name: agentgateway-monitoring
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "5"
-    argocd.argoproj.io/compare-options: ServerSideDiff=true
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   project: default
   source:
     repoURL: https://github.com/rorobig/homelab-gitops.git
     targetRevision: main
-    path: clusters
+    path: platform/observability/agentgateway
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    namespace: agentgateway-system
   syncPolicy:
     automated:
       prune: true
