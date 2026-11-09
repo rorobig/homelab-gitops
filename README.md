@@ -34,7 +34,7 @@ platform/observability/       Prometheus scrape config + Grafana dashboard for a
 | Wave | Apps |
 |---|---|
 | 0 | `gateway-api-crds` |
-| 1 | `agentgateway-crds`, `metallb`, `local-path-provisioner`, `kube-prometheus-stack` |
+| 1 | `agentgateway-crds`, `metallb`, `local-path-provisioner`, `kube-prometheus-stack`, `crossplane` |
 | 2 | `agentgateway`, `metallb-config` (.70-.71) |
 | 3 | `gateway` (.70), `dns` (.71), `agentgateway-monitoring` |
 | 4 | `routes` (Argo CD, Grafana) |
