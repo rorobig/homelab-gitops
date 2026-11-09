@@ -1,0 +1,110 @@
+# The Composition is the recipe: for every WebApp, create a ConfigMap, a Deployment and a Service.
+# Patches copy values from the WebApp (the XR) into those resources.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: webapp
+spec:
+  compositeTypeRef: # which XR this recipe is for
+    apiVersion: lab.home.arpa/v1alpha1
+    kind: WebApp
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          # 1. The web page itself
+          - name: page
+            base:
+              apiVersion: v1
+              kind: ConfigMap
+              data:
+                index.html: ""
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.message
+                toFieldPath: data[index.html]
+              # A transform changes the value on the way: WebApp "hello" -> ConfigMap "hello-page".
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-page"
+            # ConfigMaps have no status; count it as ready once it exists.
+            readinessChecks:
+              - type: None
+
+          # 2. nginx serving that page
+          - name: deployment
+            base:
+              apiVersion: apps/v1
+              kind: Deployment
+              spec:
+                selector:
+                  matchLabels: {}
+                template:
+                  metadata:
+                    labels: {}
+                  spec:
+                    containers:
+                      - name: nginx
+                        image: nginx:1.29-alpine
+                        ports:
+                          - containerPort: 80
+                        volumeMounts:
+                          - name: page
+                            mountPath: /usr/share/nginx/html
+                    volumes:
+                      - name: page
+                        configMap:
+                          name: "" # patched below
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.replicas
+                toFieldPath: spec.replicas
+              # Use the WebApp's name as the pod label, so the Service can find the pods.
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.selector.matchLabels[app]
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.template.metadata.labels[app]
+              # Mount the ConfigMap from step 1 (same name format).
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.template.spec.volumes[0].configMap.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-page"
+            # Ready when Kubernetes says the Deployment is Available.
+            readinessChecks:
+              - type: MatchCondition
+                matchCondition:
+                  type: Available
+                  status: "True"
+
+          # 3. A Service in front of the pods
+          - name: service
+            base:
+              apiVersion: v1
+              kind: Service
+              spec:
+                selector: {}
+                ports:
+                  - port: 80
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.selector[app]
+            # Services have no status; count it as ready once it exists.
+            readinessChecks:
+              - type: None

@@ -1,0 +1,10 @@
+# Your request: "I want a web app that says this". This is the XR (composite resource).
+# Crossplane sees it, runs the Composition, and creates the ConfigMap, Deployment and Service.
+apiVersion: lab.home.arpa/v1alpha1
+kind: WebApp
+metadata:
+  name: hello
+  namespace: default
+spec:
+  message: "Hello from Crossplane!"
+  replicas: 2

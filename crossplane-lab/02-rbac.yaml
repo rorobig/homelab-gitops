@@ -1,0 +1,15 @@
+# Crossplane may only create the kinds of objects it has permission for.
+# The label adds these rules to Crossplane's own ClusterRole (role aggregation).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crossplane-lab
+  labels:
+    rbac.crossplane.io/aggregate-to-crossplane: "true"
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["*"]
+  - apiGroups: [""]
+    resources: ["services", "configmaps"]
+    verbs: ["*"]

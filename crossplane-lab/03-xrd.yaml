@@ -1,0 +1,30 @@
+# The XRD (CompositeResourceDefinition) invents a new Kubernetes API: kind WebApp.
+# It only says what users may ask for (the schema). It does NOT say how to build it; that's the Composition.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: webapps.lab.home.arpa # must be <plural>.<group>
+spec:
+  group: lab.home.arpa
+  names:
+    kind: WebApp
+    plural: webapps
+  scope: Namespaced # a WebApp lives in a namespace, like a Deployment
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: The text the web page shows.
+                replicas:
+                  type: integer
+                  default: 1
+              required: [message]

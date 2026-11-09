@@ -25,7 +25,14 @@ bootstrap/root.yaml           the root app (applied once by Terraform): one Appl
 apps/                         one file = one Argo CD Application
 platform/networking/          MetalLB pool, Gateway, HTTPRoutes
 platform/observability/       Prometheus scrape config + Grafana dashboard for agentgateway
+crossplane-lab/               hands-on Crossplane lab, applied by hand (not watched by Argo CD)
 ```
+
+## Learning
+
+- **Crossplane:** [crossplane-lab/README.md](crossplane-lab/README.md). Build your own `WebApp` API in 6 steps.
+- **Talos:** "Talos in 5 minutes" and the practice list in the
+  [homelab-proxmox README](https://github.com/rorobig/homelab-proxmox#talos-in-5-minutes).
 
 ## What's deployed
 
